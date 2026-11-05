@@ -520,7 +520,7 @@ class CourseHome
         switch ($course_tool_category) {
             case TOOL_STUDENT_VIEW:
                 $conditions = ' WHERE visibility = 1 AND
-                                (category = "authoring" OR category = "interaction" OR category = "plugin") AND
+                                (category = "authoring" OR category = "plugin") AND
                                 t.name <> "notebookteacher" ';
                 if ((api_is_coach() || api_is_course_tutor() || $is_platform_admin) &&
                     $_SESSION['studentview'] !== 'studentview'
@@ -528,7 +528,6 @@ class CourseHome
                     $conditions = ' WHERE (
                         visibility = 1 AND (
                             category = "authoring" OR
-                            category = "interaction" OR
                             category = "plugin"
                         ) OR
                         (t.name = "'.TOOL_TRACKING.'")
@@ -593,7 +592,7 @@ class CourseHome
                 break;
             case TOOL_INTERACTION:
                 $sql = "SELECT * FROM $course_tool_table t
-                        WHERE category = 'interaction' AND c_id = $course_id $condition_session
+                        WHERE 1 = 0 AND c_id = $course_id $condition_session
                         ";
                 break;
             case TOOL_ADMIN_VISIBLE:
@@ -1714,20 +1713,14 @@ class CourseHome
     {
         $blocks = [];
         $my_list = self::get_tools_category(TOOL_AUTHORING);
+        $plugin_list = self::get_tools_category(TOOL_COURSE_PLUGIN);
+        if (!empty($plugin_list)) {
+            $my_list = array_merge($my_list, $plugin_list);
+        }
 
         $blocks[] = [
             'title' => get_lang('Authoring'),
             'class' => 'course-tools-author',
-            'content' => self::show_tools_category($my_list),
-        ];
-
-        $list1 = self::get_tools_category(TOOL_INTERACTION);
-        $list2 = self::get_tools_category(TOOL_COURSE_PLUGIN);
-        $my_list = array_merge($list1, $list2);
-
-        $blocks[] = [
-            'title' => get_lang('Interaction'),
-            'class' => 'course-tools-interaction',
             'content' => self::show_tools_category($my_list),
         ];
 

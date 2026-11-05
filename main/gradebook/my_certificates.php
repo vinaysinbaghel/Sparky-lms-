@@ -10,6 +10,8 @@
 $cidReset = true;
 
 require_once __DIR__.'/../inc/global.inc.php';
+require_once __DIR__.'/../inc/lib/certificate_blueprint.lib.php';
+
 api_block_inactive_user();
 
 $logInfo = [
@@ -24,6 +26,55 @@ $userId = api_get_user_id();
 
 $courseList = GradebookUtils::getUserCertificatesInCourses($userId);
 $sessionList = GradebookUtils::getUserCertificatesInSessions($userId);
+
+// Fetch Certificate Blueprints for user enrolled courses
+$userCourses = CourseManager::get_courses_list_by_user_id($userId);
+if (!empty($userCourses)) {
+    foreach ($userCourses as $uc) {
+        $cCode = $uc['code'];
+        $hasBp = CertificateBlueprint::hasCertificateForCourse($cCode);
+        if ($hasBp) {
+            // Check if already in courseList
+            $alreadyPresent = false;
+            foreach ($courseList as $cItem) {
+                if (isset($cItem['code']) && $cItem['code'] === $cCode) {
+                    $alreadyPresent = true;
+                    break;
+                }
+            }
+
+            if (!$alreadyPresent) {
+                $cTitle = !empty($uc['title']) ? $uc['title'] : $cCode;
+                $courseList[] = [
+                    'code' => $cCode,
+                    'course' => $cTitle,
+                    'score' => '100%',
+                    'date' => date('d/m/Y'),
+                    'link' => api_get_path(WEB_CODE_PATH)."gradebook/view_blueprint_certificate.php?course_code={$cCode}&user_id={$userId}",
+                    'pdf' => api_get_path(WEB_CODE_PATH)."gradebook/view_blueprint_certificate.php?course_code={$cCode}&user_id={$userId}&action=print",
+                ];
+            }
+        }
+    }
+}
+
+// If admin and no courses found, list all active blueprint courses so admin can test & preview
+if (empty($courseList) && empty($sessionList) && api_is_platform_admin()) {
+    $bpCourses = Database::query("SELECT DISTINCT course_code FROM c_certificate_blueprint_course");
+    while ($bpc = Database::fetch_array($bpCourses, 'ASSOC')) {
+        $cCode = $bpc['course_code'];
+        $cInfo = api_get_course_info($cCode);
+        $cTitle = !empty($cInfo['title']) ? $cInfo['title'] : $cCode;
+        $courseList[] = [
+            'code' => $cCode,
+            'course' => $cTitle,
+            'score' => '100%',
+            'date' => date('d/m/Y'),
+            'link' => api_get_path(WEB_CODE_PATH)."gradebook/view_blueprint_certificate.php?course_code={$cCode}&user_id={$userId}",
+            'pdf' => api_get_path(WEB_CODE_PATH)."gradebook/view_blueprint_certificate.php?course_code={$cCode}&user_id={$userId}&action=print",
+        ];
+    }
+}
 
 if (empty($courseList) && empty($sessionList)) {
     Display::addFlash(

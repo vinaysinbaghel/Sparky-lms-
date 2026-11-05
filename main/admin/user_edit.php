@@ -283,17 +283,13 @@ if (!$hideSelectProfile) {
     $form->addElement('hidden', 'status', $user_data['status']);
 }
 
-$display = isset($user_data['status']) && ($user_data['status'] == STUDENT || (isset($_POST['status']) && $_POST['status'] == STUDENT)) ? 'block' : 'none';
-
 // Platform admin
 if (api_is_platform_admin()) {
     $group = [];
     $group[] = $form->createElement('radio', 'platform_admin', null, get_lang('Yes'), 1);
     $group[] = $form->createElement('radio', 'platform_admin', null, get_lang('No'), 0);
 
-    $user_data['status'] == 1 ? $display = 'block' : $display = 'none';
-
-    $form->addElement('html', '<div id="id_platform_admin" style="display:'.$display.'">');
+    $form->addElement('html', '<div id="id_platform_admin">');
     $form->addGroup($group, 'admin', get_lang('PlatformAdmin'), null, false);
     $form->addElement('html', '</div>');
 }
@@ -353,32 +349,27 @@ if (!$user_data['platform_admin']) {
     $form->addElement('radio', 'active', get_lang('ActiveAccount'), get_lang('Active'), 1);
     $form->addElement('radio', 'active', '', get_lang('Inactive'), 0);
 }
-$studentBossList = UserManager::getStudentBossList($user_data['user_id']);
-
-$conditions = ['status' => STUDENT_BOSS];
-$studentBoss = UserManager::get_user_list($conditions);
-$studentBossToSelect = [];
-
-if ($studentBoss) {
-    foreach ($studentBoss as $bossId => $userData) {
-        $bossInfo = api_get_user_info($userData['user_id']);
-        $studentBossToSelect[$bossInfo['user_id']] = $bossInfo['complete_name_with_username'];
-    }
-}
-
-if (!empty($studentBossList)) {
-    $studentBossList = array_column($studentBossList, 'boss_id');
-}
-
-$user_data['student_boss'] = array_values($studentBossList);
-$form->addElement('advmultiselect', 'student_boss', get_lang('StudentBoss'), $studentBossToSelect);
 
 // EXTRA FIELDS
 $extraField = new ExtraField('user');
+$excludeExtraFields = [
+    'legal_accept',
+    'already_logged_in',
+    'update_type',
+    'rssfeeds',
+    'dashboard',
+    'user_chat_status',
+    'google_calendar_url',
+    'captcha_blocked_until_date',
+    'skype',
+    'mail_notify_invitation',
+    'mail_notify_message',
+    'mail_notify_group_message',
+];
 $returnParams = $extraField->addElements(
     $form,
     $user_data['user_id'],
-    [],
+    $excludeExtraFields,
     false,
     false,
     [],
@@ -529,7 +520,10 @@ if ($form->validate()) {
         $template
     );
 
-    $studentBossListSent = isset($user['student_boss']) ? $user['student_boss'] : [];
+    if ($reset_password != 0 && !empty($password)) {
+        Database::query("UPDATE ".Database::get_main_table(TABLE_MAIN_USER)." SET plain_password = '".Database::escape_string($password)."' WHERE id = $user_id");
+        UserManager::update_extra_field_value($user_id, 'plain_password', $password);
+    }
     UserManager::subscribeUserToBossList(
         $user_id,
         $studentBossListSent,
@@ -574,38 +568,69 @@ if ($form->validate()) {
     exit();
 }
 
-$actions = [
-    Display::url(
-        Display::return_icon(
-            'info.png',
-            get_lang('Information'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'admin/user_information.php?user_id='.$user_id
-    ),
-    Display::url(
-        Display::return_icon(
-            'login_as.png',
-            get_lang('LoginAs'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'admin/user_list.php?action=login_as&user_id='.$user_id.'&sec_token='.Security::getTokenFromSession()
-    ),
-];
+$actions = [];
+$actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_information.php?user_id='.$user_id.'" class="btn btn-default" style="font-weight:600;"><i class="fa fa-user"></i> '.get_lang('Information').'</a>';
+if (api_can_login_as($user_id)) {
+    $actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_list.php?action=login_as&user_id='.$user_id.'&sec_token='.Security::getTokenFromSession().'" class="btn btn-default" style="font-weight:600;"><i class="fa fa-sign-in"></i> '.get_lang('LoginAs').'</a>';
+}
+$actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_dashboard.php?role=student" class="btn btn-default" style="font-weight:600;"><i class="fa fa-users"></i> '.get_lang('UserDashboard').'</a>';
+$actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_list.php" class="btn btn-default" style="font-weight:600;"><i class="fa fa-list"></i> '.get_lang('UserList').'</a>';
 
-$content = Display::toolbarAction('toolbar-user-information', [implode(PHP_EOL, $actions)]);
+$content = Display::toolbarAction('toolbar-user-edit', [implode(' ', $actions)]);
 
 $bigImage = UserManager::getUserPicture($user_id, USER_IMAGE_SIZE_BIG);
 $normalImage = UserManager::getUserPicture($user_id, USER_IMAGE_SIZE_ORIGINAL);
-$content .= '<div class="row">';
-$content .= '<div class="col-md-10">';
-// Display form
+
+$roleBadge = '<span class="label" style="background:#4F46E5; color:#fff; font-size:11px; padding:3px 9px; border-radius:12px; font-weight:700;">Learner</span>';
+if (!empty($user_data['is_admin'])) {
+    $roleBadge = '<span class="label" style="background:#E3122B; color:#fff; font-size:11px; padding:3px 9px; border-radius:12px; font-weight:700;">Administrator</span>';
+} elseif ($user_data['status'] == COURSEMANAGER) {
+    $roleBadge = '<span class="label" style="background:#F59E0B; color:#fff; font-size:11px; padding:3px 9px; border-radius:12px; font-weight:700;">Instructor</span>';
+}
+
+$statusBadge = $user_data['active'] == 1 
+    ? '<span class="label" style="background:#ECFDF5; color:#065F46; border:1px solid #A7F3D0; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:600;">Active</span>'
+    : '<span class="label" style="background:#FEF2F2; color:#991B1B; border:1px solid #FECACA; font-size:11px; padding:3px 8px; border-radius:12px; font-weight:600;">Inactive</span>';
+
+$content .= '<div class="row" style="margin-top: 15px;">';
+
+// Left Sidebar: Compact Profile Card
+$content .= '<div class="col-md-3 col-sm-12" style="margin-bottom: 20px;">';
+$content .= '<div class="panel panel-default" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 1px 4px rgba(0,0,0,0.05); background:#ffffff; padding:22px 18px; text-align:center;">';
+$content .= '<div style="margin-bottom:14px; position:relative; display:inline-block;">';
+$content .= '<img src="'.$normalImage.'" alt="'.api_htmlentities($user_data['firstname']).'" style="width:96px; height:96px; border-radius:50%; object-fit:cover; border:3px solid #E2E8F0; box-shadow:0 3px 10px rgba(0,0,0,0.08);" />';
+$content .= '</div>';
+$content .= '<h4 style="margin:0 0 4px 0; font-weight:700; color:#0F172A; font-size:16px;">'.api_htmlentities($user_data['firstname'].' '.$user_data['lastname']).'</h4>';
+$content .= '<div style="color:#64748B; font-size:12.5px; font-weight:500; margin-bottom:12px;">@'.api_htmlentities($user_data['username']).'</div>';
+$content .= '<div style="margin-bottom:16px; display:flex; justify-content:center; gap:6px; flex-wrap:wrap;">'.$roleBadge.' '.$statusBadge.'</div>';
+$content .= '<hr style="border:0; border-top:1px solid #F1F5F9; margin:14px 0;" />';
+$content .= '<div style="text-align:left; font-size:12.5px; color:#475569; line-height:1.8;">';
+$content .= '<div><span style="color:#64748B; width:70px; display:inline-block;">User ID:</span> <strong style="color:#0F172A;">#'.$user_id.'</strong></div>';
+$content .= '<div><span style="color:#64748B; width:70px; display:inline-block;">Email:</span> <span style="color:#0F172A; word-break:break-all;">'.api_htmlentities($user_data['email']).'</span></div>';
+if (!empty($user_data['phone'])) {
+    $content .= '<div><span style="color:#64748B; width:70px; display:inline-block;">Phone:</span> <span style="color:#0F172A;">'.api_htmlentities($user_data['phone']).'</span></div>';
+}
+$content .= '<div><span style="color:#64748B; width:70px; display:inline-block;">Joined:</span> <span style="color:#0F172A;">'.$user_data['registration_date'].'</span></div>';
+$content .= '</div>';
+$content .= '</div>';
+$content .= '</div>';
+
+// Right Column: Clean Form Container
+$content .= '<div class="col-md-9 col-sm-12">';
+$content .= '<div class="panel panel-default" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 1px 4px rgba(0,0,0,0.05); background:#ffffff; padding:24px 30px; margin-bottom:30px;">';
+$content .= '<style>
+.form-horizontal .form-group { margin-bottom: 16px; }
+.form-horizontal .control-label { font-weight: 600; color: #1E293B; font-size: 13px; }
+.form-control { border-radius: 6px; border: 1px solid #CBD5E1; box-shadow: none; font-size: 13.5px; height: 38px; }
+.form-control:focus { border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+legend { font-size: 16px; font-weight: 700; color: #0F172A; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 20px; }
+.btn-primary { background: #E3122B !important; border-color: #E3122B !important; font-weight: 600; border-radius: 6px; padding: 8px 24px; font-size: 14px; }
+.btn-primary:hover { background: #C8102E !important; }
+.form-horizontal .radio, .form-horizontal .checkbox { margin-top: 4px; margin-bottom: 4px; }
+</style>';
 $content .= $form->returnForm();
 $content .= '</div>';
-$content .= '<div class="col-md-2">';
-$content .= '<a class="thumbnail expand-image" href="'.$bigImage.'" /><img src="'.$normalImage.'"></a>';
+$content .= '</div>';
 $content .= '</div>';
 
 $tpl = new Template($tool_name);

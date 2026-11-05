@@ -123,7 +123,7 @@ class Template
                 //path to the cache folder
                 'autoescape' => false,
                 'debug' => false,
-                'auto_reload' => false,
+                'auto_reload' => true,
                 'optimizations' => -1,
                 // turn on optimizations with -1
                 'strict_variables' => false,
@@ -1228,7 +1228,7 @@ class Template
             'id' => 'login',
             'autofocus' => 'autofocus',
             'icon' => 'user fa-fw',
-            'placeholder' => get_lang('UserName'),
+            'placeholder' => 'Username or Email',
         ];
         if (api_get_configuration_value('security_login_autocomplete_disable') === true) {
             $params['autocomplete'] = 'new-password';
@@ -1569,7 +1569,261 @@ class Template
             $user_info['messages_count'] = MessageManager::getCountNewMessages();
             $this->user_is_logged_in = true;
         }
+        
+        $courseUserTable = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+        $totalEnrolledStudents = (int)Database::result(
+            Database::query("SELECT COUNT(DISTINCT user_id) FROM $courseUserTable WHERE status = ".STUDENT),
+            0,
+            0
+        );
+        if ($totalEnrolledStudents === 0) {
+            $userTable = Database::get_main_table(TABLE_MAIN_USER);
+            $totalEnrolledStudents = (int)Database::result(
+                Database::query("SELECT COUNT(id) FROM $userTable WHERE status = ".STUDENT),
+                0,
+                0
+            );
+        }
+        $this->assign('total_enrolled_students', $totalEnrolledStudents > 0 ? $totalEnrolledStudents : 1);
+
         // Setting the $_u array that could be use in any template
+        
+        $currentUid = api_get_user_id();
+        $isPlatformAdmin = api_is_platform_admin();
+        $isTeacher = (api_is_teacher() && !$isPlatformAdmin);
+        $isStudent = (api_is_student() || (!$isPlatformAdmin && !$isTeacher));
+
+        $userCoursesCount = 0;
+        $userCertCount = 0;
+        if ($currentUid > 0) {
+            $userCoursesCount = (int)Database::result(
+                Database::query("SELECT COUNT(DISTINCT c_id) FROM $courseUserTable WHERE user_id = ".(int)$currentUid),
+                0,
+                0
+            );
+            $tableExists = Database::getManager()->getConnection()->getSchemaManager()->tablesExist(['c_certificate_awarded']);
+            if ($tableExists) {
+                $userCertCount = (int)Database::result(
+                    Database::query("SELECT COUNT(id) FROM c_certificate_awarded WHERE user_id = ".(int)$currentUid),
+                    0,
+                    0
+                );
+            }
+        }
+        $this->assign('is_platform_admin', $isPlatformAdmin ? 1 : 0);
+        $this->assign('is_teacher', $isTeacher ? 1 : 0);
+        $this->assign('is_student', $isStudent ? 1 : 0);
+        $this->assign('user_courses_count', $userCoursesCount);
+        $this->assign('user_certificates_count', $userCertCount);
+
+        // View Mode Handling (Learner vs Admin)
+        if (isset($_GET['action']) && $_GET['action'] === 'set_view_mode' && isset($_GET['mode'])) {
+            $newMode = ($_GET['mode'] === 'admin') ? 'admin' : 'learner';
+            ChamiloSession::write('et_view_mode', $newMode);
+            $cleanUri = preg_replace('/([?&])(action=set_view_mode|mode=[^&]*)(&|$)/', '$1', $_SERVER['REQUEST_URI']);
+            $cleanUri = rtrim(rtrim($cleanUri, '?'), '&');
+            if (empty($cleanUri) || $cleanUri === '/' || strpos($cleanUri, 'user_portal.php') !== false) {
+                $cleanUri = api_get_path(WEB_PATH).($newMode === 'admin' ? 'index.php' : 'user_portal.php');
+            }
+            header("Location: $cleanUri");
+            exit;
+        }
+
+        $viewMode = ChamiloSession::read('et_view_mode');
+        if (empty($viewMode)) {
+            $viewMode = 'learner'; // Default to Learner View as requested
+            ChamiloSession::write('et_view_mode', $viewMode);
+        }
+        $user_info['view_mode'] = $viewMode;
+        $this->assign('et_view_mode', $viewMode);
+
+        // Dynamic Dashboard Metrics
+        $totalPlatformCourses = (int)Database::result(Database::query("SELECT COUNT(*) FROM ".Database::get_main_table(TABLE_MAIN_COURSE)." WHERE visibility > 0"), 0, 0);
+        $totalEnrolledStudents = (int)Database::result(Database::query("SELECT COUNT(DISTINCT user_id) FROM ".Database::get_main_table(TABLE_MAIN_COURSE_USER)." WHERE status = 5"), 0, 0);
+        $totalAwardedCreds = 0;
+        $tableAwarded = 'c_certificate_awarded';
+        $resTbl = Database::query("SHOW TABLES LIKE '$tableAwarded'");
+        if ($resTbl && Database::num_rows($resTbl) > 0) {
+            $totalAwardedCreds = (int)Database::result(Database::query("SELECT COUNT(*) FROM $tableAwarded"), 0, 0);
+        }
+        // ETupskill Scheduled Upcoming Agenda & Masterclass Events for Homepage
+        require_once api_get_path(SYS_CODE_PATH).'inc/lib/agenda.lib.php';
+        $currentUid = !empty($user_info['user_id']) ? (int)$user_info['user_id'] : (int)api_get_user_id();
+        $upcomingAgendaEvents = ($currentUid > 0) ? Agenda::getUpcomingUserEvents($currentUid, 10) : [];
+        $this->assign('upcoming_agenda_events', $upcomingAgendaEvents);
+        $this->assign('has_upcoming_events', !empty($upcomingAgendaEvents));
+        $this->assign('primary_upcoming_event', !empty($upcomingAgendaEvents) ? $upcomingAgendaEvents[0] : null);
+
+        // Calculate dynamic upcoming scheduled webinars/events count across personal, course, and platform calendars
+        $nowUtc = api_get_utc_datetime();
+        $t_personal = Database::get_main_table(TABLE_PERSONAL_AGENDA);
+        $t_course_cal = Database::get_course_table(TABLE_AGENDA);
+        $t_sys_cal = Database::get_main_table(TABLE_MAIN_SYSTEM_CALENDAR);
+
+        $sqlUpcomingTotal = "SELECT (
+            (SELECT COUNT(*) FROM $t_personal WHERE date >= DATE_SUB('$nowUtc', INTERVAL 1 HOUR) OR (enddate IS NOT NULL AND enddate >= '$nowUtc')) +
+            (SELECT COUNT(*) FROM $t_course_cal WHERE start_date >= DATE_SUB('$nowUtc', INTERVAL 1 HOUR) OR (end_date IS NOT NULL AND end_date >= '$nowUtc')) +
+            (SELECT COUNT(*) FROM $t_sys_cal WHERE start_date >= DATE_SUB('$nowUtc', INTERVAL 1 HOUR) OR (end_date IS NOT NULL AND end_date >= '$nowUtc'))
+        ) AS total_upcoming";
+        
+        $totalLiveEvents = (int)Database::result(Database::query($sqlUpcomingTotal), 0, 0);
+
+        $this->assign('total_platform_courses', $totalPlatformCourses);
+        $this->assign('total_enrolled_students', $totalEnrolledStudents);
+        $this->assign('total_awarded_credentials', $totalAwardedCreds);
+        $this->assign('total_live_events', $totalLiveEvents);
+
+        if ($isPlatformAdmin) {
+            $courseTable = Database::get_main_table(TABLE_MAIN_COURSE);
+            $catTable = Database::get_main_table(TABLE_MAIN_CATEGORY);
+            $relUserTable = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+            $userTable = Database::get_main_table(TABLE_MAIN_USER);
+
+            // Pre-fetch teachers for all courses
+            $teachersByCourse = [];
+            $sqlTeachers = "SELECT cu.c_id, u.firstname, u.lastname, u.username 
+                            FROM $relUserTable cu 
+                            JOIN $userTable u ON cu.user_id = u.id 
+                            WHERE cu.status = 1";
+            $resTeachers = Database::query($sqlTeachers);
+            if ($resTeachers) {
+                while ($tRow = Database::fetch_assoc($resTeachers)) {
+                    $cId = (int)$tRow['c_id'];
+                    $name = api_get_person_name($tRow['firstname'], $tRow['lastname']);
+                    if (empty(trim($name))) {
+                        $name = $tRow['username'];
+                    }
+                    $teachersByCourse[$cId][] = $name;
+                }
+            }
+
+            // Fetch all platform courses with category, student count, chapter count, and lesson count
+            $sqlCourses = "
+                SELECT 
+                    c.id,
+                    c.code,
+                    c.visual_code,
+                    c.title,
+                    c.directory,
+                    c.category_code,
+                    c.visibility,
+                    c.creation_date,
+                    c.tutor_name,
+                    cat.name AS category_name,
+                    COUNT(DISTINCT cu.user_id) AS student_count,
+                    (SELECT COUNT(*) FROM c_curriculum_chapter cc WHERE cc.course_code = c.code) AS chapter_count,
+                    (SELECT COUNT(*) FROM c_curriculum_lesson cl WHERE cl.course_code = c.code) AS lesson_count
+                FROM $courseTable c
+                LEFT JOIN $catTable cat ON c.category_code = cat.code
+                LEFT JOIN $relUserTable cu ON c.id = cu.c_id AND cu.status = ".STUDENT."
+                GROUP BY c.id
+                ORDER BY c.title ASC
+            ";
+            $resCourses = Database::query($sqlCourses);
+            $allCourses = [];
+            $webCoursePath = api_get_path(WEB_COURSE_PATH);
+            $sysCoursePath = api_get_path(SYS_COURSE_PATH);
+            $webCodePath = api_get_path(WEB_CODE_PATH);
+
+            $statTotal = 0;
+            $statActive = 0;
+            $statPrivate = 0;
+            $statOpen = 0;
+            $statClosed = 0;
+
+            if ($resCourses) {
+                while ($cRow = Database::fetch_assoc($resCourses)) {
+                    $cId = (int)$cRow['id'];
+                    $cDir = $cRow['directory'];
+                    $hasCustomImg = (!empty($cDir) && file_exists($sysCoursePath . $cDir . '/course-pic.png'));
+                    $imgUrl = $hasCustomImg ? ($webCoursePath . $cDir . '/course-pic.png') : '';
+
+                    $visibility = (int)$cRow['visibility'];
+                    $visibilityLabel = 'Private';
+                    $visibilityBadge = 'et-badge-blue';
+                    $filterGroup = 'private';
+
+                    if ($visibility === 0 || $visibility === 4) {
+                        $visibilityLabel = ($visibility === 4) ? 'Hidden' : 'Closed / Draft';
+                        $visibilityBadge = 'et-badge-gray';
+                        $filterGroup = 'closed';
+                        $statClosed++;
+                    } elseif ($visibility === 1) {
+                        $visibilityLabel = 'Registered Only';
+                        $visibilityBadge = 'et-badge-blue';
+                        $filterGroup = 'private';
+                        $statPrivate++;
+                        $statActive++;
+                    } elseif ($visibility === 2 || $visibility === 3) {
+                        $visibilityLabel = ($visibility === 3) ? 'Public' : 'Platform Open';
+                        $visibilityBadge = 'et-badge-emerald';
+                        $filterGroup = 'open';
+                        $statOpen++;
+                        $statActive++;
+                    }
+                    $statTotal++;
+
+                    $formattedDate = '';
+                    if (!empty($cRow['creation_date']) && $cRow['creation_date'] !== '0000-00-00 00:00:00') {
+                        $formattedDate = api_format_date($cRow['creation_date'], DATE_FORMAT_SHORT);
+                    }
+
+                    $teacher = !empty($cRow['tutor_name']) 
+                        ? $cRow['tutor_name'] 
+                        : (!empty($teachersByCourse[$cId]) ? implode(', ', $teachersByCourse[$cId]) : 'Platform Faculty');
+
+                    $allCourses[] = [
+                        'id' => $cId,
+                        'code' => $cRow['code'],
+                        'visual_code' => !empty($cRow['visual_code']) ? $cRow['visual_code'] : $cRow['code'],
+                        'title' => $cRow['title'],
+                        'directory' => $cDir,
+                        'category_code' => $cRow['category_code'],
+                        'category_name' => !empty($cRow['category_name']) ? $cRow['category_name'] : 'General',
+                        'visibility' => $visibility,
+                        'visibility_label' => $visibilityLabel,
+                        'visibility_badge' => $visibilityBadge,
+                        'filter_group' => $filterGroup,
+                        'creation_date' => $formattedDate,
+                        'teacher_name' => $teacher,
+                        'student_count' => (int)$cRow['student_count'],
+                        'chapter_count' => (int)$cRow['chapter_count'],
+                        'lesson_count' => (int)$cRow['lesson_count'],
+                        'image_url' => $imgUrl,
+                        'has_custom_image' => $hasCustomImg,
+                        'home_url' => $webCoursePath . $cDir . '/index.php',
+                        'curriculum_url' => $webCodePath . 'admin/course_curriculum.php?code=' . urlencode($cRow['code']),
+                        'edit_url' => $webCodePath . 'admin/course_edit.php?id=' . $cId,
+                        'students_url' => $webCodePath . 'admin/user_dashboard.php?course_id=' . $cId . '&role=student',
+                        'tracking_url' => $webCodePath . 'mySpace/course.php?course_code=' . urlencode($cRow['code']),
+                    ];
+                }
+            }
+
+            // Categories list for filtering
+            $categoriesList = [];
+            $resCats = Database::query("SELECT code, name FROM $catTable ORDER BY name ASC");
+            if ($resCats) {
+                while ($cat = Database::fetch_assoc($resCats)) {
+                    $categoriesList[] = [
+                        'code' => $cat['code'],
+                        'name' => $cat['name'],
+                    ];
+                }
+            }
+
+            $this->assign('all_platform_courses', $allCourses);
+            $this->assign('all_platform_courses_count', count($allCourses));
+            $this->assign('platform_categories', $categoriesList);
+            $this->assign('course_counts', [
+                'total' => $statTotal,
+                'active' => $statActive,
+                'open' => $statOpen,
+                'private' => $statPrivate,
+                'closed' => $statClosed,
+            ]);
+        }
+
         $this->assign('_u', $user_info);
     }
 
@@ -1764,9 +2018,7 @@ class Template
 
         if ($sendHeaders) {
             header('Content-Type: text/html; charset='.api_get_system_encoding());
-            header(
-                'X-Powered-By: '.$_configuration['software_name'].' '.substr($_configuration['system_version'], 0, 1)
-            );
+            header('X-Powered-By: Sparky');
             self::addHTTPSecurityHeaders();
 
             $responseCode = $this->getResponseCode();

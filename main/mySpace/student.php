@@ -178,8 +178,16 @@ function get_users($from, $limit, $column = 0, $direction = 3, $getCount = false
         $student_id = $student_data['user_id'];
         $student_data = api_get_user_info($student_id);
 
-        if (isset($_GET['id_session'])) {
+        if (isset($_GET['id_session']) && !empty($sessionId)) {
             $courses = Tracking::get_course_list_in_session_from_student($student_id, $sessionId);
+        } else {
+            $userCourses = CourseManager::get_courses_list_by_user_id($student_id);
+            $courses = [];
+            if (!empty($userCourses)) {
+                foreach ($userCourses as $ucItem) {
+                    $courses[] = $ucItem['code'];
+                }
+            }
         }
 
         $avg_time_spent = $avg_student_score = $avg_student_progress = 0;

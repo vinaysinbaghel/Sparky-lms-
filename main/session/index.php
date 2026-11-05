@@ -16,7 +16,8 @@ require_once __DIR__.'/../inc/global.inc.php';
 $session_id = isset($_GET['session_id']) ? (int) $_GET['session_id'] : 0;
 
 if (empty($session_id)) {
-    api_not_allowed(true);
+    header('Location: '.api_get_path(WEB_CODE_PATH).'calendar/agenda_js.php');
+    exit;
 }
 
 $sessionField = new ExtraFieldValue('session');

@@ -29,8 +29,18 @@ function get_tabs($courseId = null)
 
     $navigation = [];
 
-    // Campus Homepage
-    $navigation[SECTION_CAMPUS]['url'] = api_get_path(WEB_PATH).'index.php';
+    // Campus Homepage: In user view, homepage is user_portal.php (courses dashboard)
+    $viewMode = Session::read('et_view_mode');
+    if (empty($viewMode)) {
+        $viewMode = 'learner';
+    }
+    $isUserView = (!api_is_platform_admin() || $viewMode === 'learner');
+
+    if (!api_is_anonymous() && $isUserView) {
+        $navigation[SECTION_CAMPUS]['url'] = api_get_path(WEB_PATH).'user_portal.php';
+    } else {
+        $navigation[SECTION_CAMPUS]['url'] = api_get_path(WEB_PATH).'index.php';
+    }
     $navigation[SECTION_CAMPUS]['title'] = get_lang('CampusHomepage');
     $navigation[SECTION_CAMPUS]['key'] = 'homepage';
     $navigation[SECTION_CAMPUS]['icon'] = 'homepage.png';
@@ -108,13 +118,7 @@ function get_tabs($courseId = null)
         }
     }
 
-    // Social
-    if (api_get_setting('allow_social_tool') == 'true') {
-        $navigation['social']['url'] = api_get_path(WEB_CODE_PATH).'social/home.php';
-        $navigation['social']['title'] = get_lang('SocialNetwork');
-        $navigation['social']['key'] = 'social-network';
-        $navigation['social']['icon'] = 'social-network.png';
-    }
+
 
     // Dashboard
     if (api_is_platform_admin() || api_is_drh() || api_is_session_admin()) {
@@ -142,6 +146,11 @@ function get_tabs($courseId = null)
 
     // Platform administration
     if (api_is_platform_admin(true)) {
+        $navigation['user_dashboard']['url'] = api_get_path(WEB_CODE_PATH).'admin/user_dashboard.php';
+        $navigation['user_dashboard']['title'] = 'Students & Faculty';
+        $navigation['user_dashboard']['key'] = 'user_dashboard';
+        $navigation['user_dashboard']['icon'] = 'members.png';
+
         $navigation['platform_admin']['url'] = api_get_path(WEB_CODE_PATH).'admin/';
         $navigation['platform_admin']['title'] = get_lang('PlatformAdmin');
         $navigation['platform_admin']['key'] = 'admin';
@@ -375,11 +384,19 @@ function return_navigation_array()
     }
 
     if (api_get_user_id() && !api_is_anonymous()) {
-        // My Courses
-        if (api_get_setting('show_tabs', 'my_courses') == 'true') {
-            $navigation['mycourses'] = $possible_tabs['mycourses'];
-        } else {
-            $menu_navigation['mycourses'] = $possible_tabs['mycourses'];
+        // My Courses: In user view, homepage is the courses tab, so mycourses is omitted
+        $viewMode = Session::read('et_view_mode');
+        if (empty($viewMode)) {
+            $viewMode = 'learner';
+        }
+        $isUserView = (!api_is_platform_admin() || $viewMode === 'learner');
+
+        if (!$isUserView) {
+            if (api_get_setting('show_tabs', 'my_courses') == 'true') {
+                $navigation['mycourses'] = $possible_tabs['mycourses'];
+            } else {
+                $menu_navigation['mycourses'] = $possible_tabs['mycourses'];
+            }
         }
 
         // My Profile
@@ -422,14 +439,7 @@ function return_navigation_array()
             }
         }
 
-        // Social Networking
-        if (api_get_setting('show_tabs', 'social') == 'true') {
-            if (api_get_setting('allow_social_tool') == 'true') {
-                $navigation['social'] = isset($possible_tabs['social']) ? $possible_tabs['social'] : null;
-            }
-        } else {
-            $menu_navigation['social'] = isset($possible_tabs['social']) ? $possible_tabs['social'] : null;
-        }
+
 
         // Dashboard
         if (api_get_setting('show_tabs', 'dashboard') == 'true') {
@@ -458,6 +468,9 @@ function return_navigation_array()
 
         // Administration
         if (api_is_platform_admin(true)) {
+            if (isset($possible_tabs['user_dashboard'])) {
+                $navigation['user_dashboard'] = $possible_tabs['user_dashboard'];
+            }
             if (api_get_setting('show_tabs', 'platform_administration') == 'true') {
                 $navigation['platform_admin'] = $possible_tabs['platform_admin'];
             } else {
@@ -681,6 +694,12 @@ function menuArray()
                 if ($tempSection == $GLOBALS['this_section']) {
                     $activeSection = $section;
                 }
+                // When on user_portal.php (SECTION_COURSES) in user view, mark homepage as active
+                $viewMode = Session::read('et_view_mode');
+                $isUserView = (!api_is_platform_admin() || $viewMode === 'learner' || empty($viewMode));
+                if ($GLOBALS['this_section'] == SECTION_COURSES && $isUserView && $section == SECTION_CAMPUS) {
+                    $activeSection = $section;
+                }
                 // If we're on the index page and a specific extra link has been
                 // loaded
                 if ($GLOBALS['this_section'] == SECTION_CAMPUS) {
@@ -699,6 +718,11 @@ function menuArray()
         if (!empty($activeSection)) {
             $mainNavigation['navigation'][$activeSection]['current'] = 'active';
         }
+    }
+    $viewMode = Session::read('et_view_mode');
+    $isUserView = (!api_is_platform_admin() || $viewMode === 'learner' || empty($viewMode));
+    if (!api_is_anonymous() && $isUserView) {
+        unset($mainNavigation['navigation']['mycourses']);
     }
     unset($mainNavigation['navigation']['myprofile']);
 

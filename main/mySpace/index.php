@@ -58,205 +58,46 @@ $menu_items = [];
 $pluginCalendar = api_get_plugin_setting('learning_calendar', 'enabled') === 'true';
 $calendarMenuAdded = false;
 
+// Modernized Reporting Navigation (Cleaned toolbar, removed session_filter, trainer view, certificate list)
+$actionsLeft = '
+<div class="btn-group" role="group" style="display:inline-flex; flex-wrap:wrap; gap:6px;">
+    <a href="'.api_get_path(WEB_CODE_PATH).'mySpace/index.php" class="btn btn-default btn-sm active" style="font-weight:600; border-radius:8px; border:1px solid #CBD5E1; background:#EEF2FF; color:#4F46E5;">
+        <i class="fa fa-th-large" style="margin-right:4px;"></i> '.get_lang('Overview').'
+    </a>
+    <a href="'.api_get_path(WEB_CODE_PATH).'mySpace/student.php" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#334155;">
+        <i class="fa fa-graduation-cap text-info" style="margin-right:4px;"></i> '.get_lang('Students').'
+    </a>
+    <a href="'.api_get_path(WEB_CODE_PATH).'mySpace/course.php" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#334155;">
+        <i class="fa fa-book text-danger" style="margin-right:4px;"></i> '.get_lang('Courses').'
+    </a>
+    <a href="'.api_get_path(WEB_CODE_PATH).'tracking/exams.php" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#334155;">
+        <i class="fa fa-check-square-o text-warning" style="margin-right:4px;"></i> '.get_lang('ExamTracking').'
+    </a>
+    <a href="'.api_get_path(WEB_CODE_PATH).'auth/my_progress.php" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#334155;">
+        <i class="fa fa-line-chart text-success" style="margin-right:4px;"></i> '.get_lang('MyStats').'
+    </a>';
+
 if ($is_platform_admin) {
-    if ($view === 'admin') {
-        $menu_items[] = Display::url(
-            Display::return_icon('teacher.png', get_lang('TeacherInterface'), [], ICON_SIZE_MEDIUM),
-            api_get_self().'?view=teacher'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('star_na.png', get_lang('AdminInterface'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/admin_view.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('quiz.png', get_lang('ExamTracking'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'tracking/exams.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('statistics.png', get_lang('CurrentCoursesReport'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/current_courses.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('session.png', get_lang('SessionFilterReport'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/session_filter.php'
-        );
-    } else {
-        $menu_items[] = Display::url(
-            Display::return_icon(
-                'teacher_na.png',
-                get_lang('TeacherInterface'),
-                [],
-                ICON_SIZE_MEDIUM
-            ),
-            ''
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('star.png', get_lang('AdminInterface'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/admin_view.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('quiz.png', get_lang('ExamTracking'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'tracking/exams.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('statistics.png', get_lang('CurrentCoursesReport'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/current_courses.php'
-        );
-        $menu_items[] = Display::url(
-            Display::return_icon('session.png', get_lang('SessionFilterReport'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_CODE_PATH).'mySpace/session_filter.php'
-        );
-
-        if ($pluginCalendar) {
-            $lpCalendar = LearningCalendarPlugin::create();
-            $menu_items[] = Display::url(
-                Display::return_icon('agenda.png', $lpCalendar->get_lang('LearningCalendar'), [], ICON_SIZE_MEDIUM),
-                api_get_path(WEB_PLUGIN_PATH).'learning_calendar/start.php'
-            );
-            $calendarMenuAdded = true;
-        }
-    }
+    $actionsLeft .= '
+    <a href="'.api_get_path(WEB_CODE_PATH).'mySpace/admin_view.php" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#64748B;">
+        <i class="fa fa-sliders" style="margin-right:4px;"></i> '.get_lang('AdminInterface').'
+    </a>';
 }
-
-if ($is_drh) {
-    $view = 'drh';
-    $menu_items[] = Display::url(
-        Display::return_icon('user_na.png', get_lang('Students'), [], ICON_SIZE_MEDIUM),
-        '#'
-    );
-    $menu_items[] = Display::url(
-        Display::return_icon('teacher.png', get_lang('Trainers'), [], ICON_SIZE_MEDIUM),
-        'teachers.php'
-    );
-    $menu_items[] = Display::url(
-        Display::return_icon('course.png', get_lang('Courses'), [], ICON_SIZE_MEDIUM),
-        'course.php'
-    );
-    $menu_items[] = Display::url(
-        Display::return_icon('session.png', get_lang('Sessions'), [], ICON_SIZE_MEDIUM),
-        'session.php'
-    );
-    $menu_items[] = Display::url(
-        Display::return_icon('empty_evaluation.png', get_lang('CompanyReport'), [], ICON_SIZE_MEDIUM),
-        'company_reports.php'
-    );
-    $menu_items[] = Display::url(
-        Display::return_icon('evaluation_rate.png', get_lang('CompanyReportResumed'), [], ICON_SIZE_MEDIUM),
-        'company_reports_resumed.php'
-    );
-}
+$actionsLeft .= '</div>';
 
 $actionsRight = '';
-$actionsLeft = '';
 if ($display === 'useroverview' || $display === 'sessionoverview' || $display === 'courseoverview') {
     $actionsRight .= Display::url(
-        Display::return_icon(
-            'export_csv.png',
-            get_lang('ExportAsCSV'),
-            null,
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_self().'?display='.$display.'&export=csv&view='.$view
+        '<i class="fa fa-file-excel-o text-success" style="margin-right:4px;"></i> '.get_lang('ExportAsCSV'),
+        api_get_self().'?display='.$display.'&export=csv&view='.$view,
+        ['class' => 'btn btn-default btn-sm', 'style' => 'font-weight:600; border-radius:8px; margin-right: 6px;']
     );
 }
 
-$actionsRight .= Display::url(
-    Display::return_icon(
-        'printer.png',
-        get_lang('Print'),
-        null,
-        ICON_SIZE_MEDIUM
-    ),
-    'javascript: void(0);',
-    ['onclick' => 'javascript: window.print()']
-);
-
-if (!empty($session_id) &&
-    !in_array(
-        $display,
-        ['accessoverview', 'lpprogressoverview', 'progressoverview', 'exerciseprogress', 'surveyoverview']
-    )
-) {
-    $actionsLeft .= Display::url(
-        Display::return_icon(
-            'back.png',
-            get_lang('Back'),
-            null,
-            ICON_SIZE_MEDIUM
-        ),
-        'index.php'
-    );
-    if (!api_is_platform_admin()) {
-        if (api_get_setting('add_users_by_coach') === 'true') {
-            if ($is_coach) {
-                $actionsLeft .= Display::url(
-                    Display::return_icon(
-                        'excel.png',
-                        get_lang('ImportUserList'),
-                        null,
-                        ICON_SIZE_MEDIUM
-                    ),
-                    'user_import.php?id_session='.$session_id.'&action=export&amp;type=xml'
-                );
-            }
-        }
-    } else {
-        Display::url(
-            Display::return_icon(
-                'excel.png',
-                get_lang('ImportUserList'),
-                null,
-                ICON_SIZE_MEDIUM
-            ),
-            'user_import.php?id_session='.$session_id.'&action=export&amp;type=xml'
-        );
-    }
-} else {
-    $actionsLeft .= Display::url(
-        Display::return_icon(
-            'statistics.png',
-            get_lang('MyStats'),
-            null,
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'auth/my_progress.php'
-    );
-
-    if ($pluginCalendar && api_is_teacher() && $calendarMenuAdded === false) {
-        $lpCalendar = LearningCalendarPlugin::create();
-        $actionsLeft .= Display::url(
-            Display::return_icon('agenda.png', $lpCalendar->get_lang('LearningCalendar'), [], ICON_SIZE_MEDIUM),
-            api_get_path(WEB_PLUGIN_PATH).'learning_calendar/start.php'
-        );
-    }
-
-    if (api_is_platform_admin(true) || api_is_student_boss()) {
-        $actionsLeft .= Display::url(
-            Display::return_icon(
-                "certificate_list.png",
-                get_lang('GradebookSeeListOfStudentsCertificates'),
-                null,
-                ICON_SIZE_MEDIUM
-            ),
-            api_get_path(WEB_CODE_PATH).'gradebook/certificate_report.php'
-        );
-    }
-}
-
-// Actions menu
-$nb_menu_items = count($menu_items);
-if (empty($session_id) ||
-    in_array(
-        $display,
-        ['accessoverview', 'lpprogressoverview', 'progressoverview', 'exerciseprogress', 'surveyoverview']
-    )
-) {
-    if ($nb_menu_items > 1) {
-        foreach ($menu_items as $key => $item) {
-            $actionsLeft .= $item;
-        }
-    }
-}
+$actionsRight .= '
+<a href="javascript:void(0);" onclick="window.print()" class="btn btn-default btn-sm" style="font-weight:600; border-radius:8px; border:1px solid #E2E8F0; background:#fff; color:#475569;">
+    <i class="fa fa-print text-muted" style="margin-right:4px;"></i> '.get_lang('Print').'
+</a>';
 
 $userId = api_get_user_id();
 $stats = Tracking::getStats($userId, true);
@@ -396,6 +237,59 @@ $view->assign('header', $nameTools);
 $view->assign('form', $form->returnForm());
 $view->assign('actions', Display::toolbarAction('toolbar', [$actionsLeft, $actionsRight]));
 $view->assign('title', get_lang('Students').' ('.$numberStudents.')');
+
+require_once __DIR__.'/../inc/lib/certificate_blueprint.lib.php';
+
+// Actual platform metrics (connected with real modified database records)
+$totalStudents = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_USER), "status = 5");
+$totalCourses = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_COURSE));
+$totalEnrollments = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_COURSE_USER), "status = 5");
+$totalTrainers = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_USER), "status = 1");
+$totalBlueprints = (int) Database::count_rows('c_certificate_blueprint');
+
+// Active Courses Breakdown with real student enrollments
+$allCourses = Database::select('id, code, title, visual_code', Database::get_main_table(TABLE_MAIN_COURSE));
+$coursesSummary = [];
+if (!empty($allCourses)) {
+    foreach ($allCourses as $c) {
+        $enrolledCount = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_COURSE_USER), "c_id = {$c['id']} AND status = 5");
+        $hasBp = CertificateBlueprint::hasCertificateForCourse($c['code']);
+        $coursesSummary[] = [
+            'id' => $c['id'],
+            'code' => $c['code'],
+            'title' => $c['title'],
+            'enrolled' => $enrolledCount,
+            'has_certificate' => $hasBp,
+        ];
+    }
+}
+
+// Active Learners List with real course counts & activity
+$allStudents = Database::select('id, username, firstname, lastname, email, registration_date', Database::get_main_table(TABLE_MAIN_USER), ['where' => ['status = ?' => 5], 'order' => 'id DESC']);
+$studentsSummary = [];
+if (!empty($allStudents)) {
+    foreach ($allStudents as $st) {
+        $enrolledCount = (int) Database::count_rows(Database::get_main_table(TABLE_MAIN_COURSE_USER), "user_id = {$st['id']} AND status = 5");
+        $lastLogin = Tracking::get_last_connection_date($st['id'], true);
+        $studentsSummary[] = [
+            'id' => $st['id'],
+            'username' => $st['username'],
+            'name' => trim($st['firstname'].' '.$st['lastname']) ?: $st['username'],
+            'email' => $st['email'],
+            'courses_count' => $enrolledCount,
+            'last_login' => $lastLogin ?: 'Never',
+            'reg_date' => substr($st['registration_date'], 0, 10),
+        ];
+    }
+}
+
+$view->assign('total_students', $totalStudents);
+$view->assign('total_courses', $totalCourses);
+$view->assign('total_enrollments', $totalEnrollments);
+$view->assign('total_trainers', $totalTrainers);
+$view->assign('total_blueprints', $totalBlueprints);
+$view->assign('courses_summary', $coursesSummary);
+$view->assign('students_summary', $studentsSummary);
 
 $template = $view->get_template('my_space/index.tpl');
 $content = $view->fetch($template);

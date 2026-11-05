@@ -99,8 +99,13 @@ if (api_is_platform_admin()) {
     $blocks['users']['editable'] = true;
     $items = [
         [
+            'class' => 'item-user-dashboard',
+            'url' => 'user_dashboard.php',
+            'label' => '⚡ User & Enrollment Center (Sparky)',
+        ],
+        [
             'class' => 'item-user-list',
-            'url' => 'user_list.php',
+            'url' => 'user_dashboard.php',
             'label' => get_lang('UserList'),
         ],
         [
@@ -327,13 +332,16 @@ if (api_is_platform_admin()) {
     //    'label' => get_lang('ImportPDFIntroToCourses'),
     //];
 
-    if (api_get_setting('gradebook_enable_grade_model') == 'true') {
-        $items[] = [
-            'class' => 'item-grade-model',
-            'url' => 'grade_models.php',
-            'label' => get_lang('GradeModel'),
-        ];
-    }
+    $items[] = [
+        'class' => 'item-grade-model',
+        'url' => 'certificate_blueprints.php',
+        'label' => 'Certificate Blueprints',
+    ];
+    $items[] = [
+        'class' => 'item-grade-model',
+        'url' => 'awarded_certificates.php',
+        'label' => 'Awarded Certificates Log',
+    ];
 
     if (isset($extAuthSource) && isset($extAuthSource['ldap']) && count($extAuthSource['ldap']) > 0) {
         $items[] = [
@@ -572,7 +580,7 @@ $blocks['sessions']['icon'] = Display::return_icon(
     ICON_SIZE_MEDIUM,
     false
 );
-$blocks['sessions']['label'] = api_ucfirst(get_lang('Sessions'));
+$blocks['sessions']['label'] = 'Coaching & Cohorts';
 $blocks['sessions']['class'] = 'block-admin-sessions';
 
 $sessionsBlockExtraFile = "{$adminExtraContentDir}block-admin-sessions_extra.html";
@@ -603,17 +611,17 @@ $items = [];
 $items[] = [
     'class' => 'item-session-list',
     'url' => $sessionPath.'session_list.php',
-    'label' => get_lang('ListSession'),
+    'label' => 'All Coaching Programs & Cohorts',
 ];
 $items[] = [
     'class' => 'item-session-add',
     'url' => $sessionPath.'session_add.php',
-    'label' => get_lang('AddSession'),
+    'label' => 'Create Coaching Program',
 ];
 $items[] = [
     'class' => 'item-session-category',
     'url' => $sessionPath.'session_category_list.php',
-    'label' => get_lang('ListSessionCategory'),
+    'label' => 'Coaching Categories',
 ];
 $items[] = [
     'class' => 'item-session-import',
@@ -1003,6 +1011,8 @@ if (api_is_platform_admin()) {
     $blocks['version_check']['search_form'] = null;
     $blocks['version_check']['items'] = '<div class="block-admin-version_check"></div>';
     $blocks['version_check']['class'] = 'block-admin-version-check';
+    unset($blocks['chamilo']);
+    unset($blocks['version_check']);
 
     // Check Hook Event for Admin Block Object
     if (!empty($hook)) {
@@ -1117,3 +1127,4 @@ $admin_template = $tpl->get_template('admin/settings_index.tpl');
 $content = $tpl->fetch($admin_template);
 $tpl->assign('content', $content);
 $tpl->display_one_col_template();
+

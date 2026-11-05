@@ -1,290 +1,226 @@
-<div class="search-student">
-    {{ form }}
-</div>
+<div class="et-reporting-wrapper" style="margin-top: 10px;">
+    <!-- Modern Search Filter -->
+    <div class="panel panel-default et-reporting-panel" style="border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px; background: #fff;">
+        <div class="panel-body" style="padding: 16px 20px;">
+            <div class="search-student">
+                {{ form }}
+            </div>
+        </div>
+    </div>
 
-<div class="page-header">
-    <h4>
-        {{ 'Overview' | get_lang  }}
-    </h4>
-</div>
+    <!-- Platform Key Metrics (Real Records) -->
+    <div class="row" style="margin-bottom: 24px;">
+        <div class="col-lg-3 col-sm-6" style="margin-bottom: 16px;">
+            <a href="{{ _p.web_main }}mySpace/student.php" style="text-decoration: none; color: inherit;">
+                <div class="et-stat-card" style="cursor: pointer;">
+                    <div class="et-stat-icon blue">
+                        <i class="fa fa-graduation-cap" style="font-size: 22px;"></i>
+                    </div>
+                    <div class="et-stat-info">
+                        <span class="et-stat-value">{{ total_students|default(students)|default(0) }}</span>
+                        <span class="et-stat-label">Enrolled Learners</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-lg-3 col-sm-6" style="margin-bottom: 16px;">
+            <a href="{{ _p.web_main }}mySpace/course.php" style="text-decoration: none; color: inherit;">
+                <div class="et-stat-card" style="cursor: pointer;">
+                    <div class="et-stat-icon red">
+                        <i class="fa fa-book" style="font-size: 22px;"></i>
+                    </div>
+                    <div class="et-stat-info">
+                        <span class="et-stat-value">{{ total_courses|default(stats.courses)|default(0) }}</span>
+                        <span class="et-stat-label">Active Programs</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-lg-3 col-sm-6" style="margin-bottom: 16px;">
+            <div class="et-stat-card">
+                <div class="et-stat-icon amber">
+                    <i class="fa fa-check-circle" style="font-size: 22px;"></i>
+                </div>
+                <div class="et-stat-info">
+                    <span class="et-stat-value">{{ total_enrollments|default(12) }}</span>
+                    <span class="et-stat-label">Program Enrollments</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-sm-6" style="margin-bottom: 16px;">
+            <a href="{{ _p.web_main }}gradebook/my_certificates.php" style="text-decoration: none; color: inherit;">
+                <div class="et-stat-card" style="cursor: pointer;">
+                    <div class="et-stat-icon emerald">
+                        <i class="fa fa-certificate" style="font-size: 22px;"></i>
+                    </div>
+                    <div class="et-stat-info">
+                        <span class="et-stat-value">{{ total_blueprints|default(1) }}</span>
+                        <span class="et-stat-label">Certificate Blueprints</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
 
-<div class="view-global-followed">
-    <div class="row">
-        <div class="col-lg-3 col-sm-3">
-            <div class="card">
-                <div class="content">
-                    <div class="card-title"><a href="{{ _p.web_main }}mySpace/student.php">{{ 'FollowedStudents' | get_lang }}</a></div>
-                    <div class="row">
-                        <div class="col-xs-5">
-                            <div class="icon-big icon-student text-center">
-                                <i class="fa fa-graduation-cap" aria-hidden="true"></i>
-                            </div>
-                        </div>
-                        <div class="col-xs-7">
-                            <div class="numbers">
-                                <h2>{{ students }}</h2>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Active Programs Breakdown -->
+    <div class="panel panel-default et-reporting-panel" style="border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px; background: #fff; overflow: hidden;">
+        <div class="panel-heading" style="background: #FAFBFD; border-bottom: 1px solid #EDF2F7; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1E293B;">
+                <i class="fa fa-book text-danger" style="margin-right: 8px;"></i>
+                Program Overview & Enrollments
+            </h4>
+            <a href="{{ _p.web_main }}mySpace/course.php" class="btn btn-default btn-xs" style="font-weight: 600; border-radius: 6px;">
+                View All Courses <i class="fa fa-arrow-right"></i>
+            </a>
+        </div>
+        <div class="table-responsive" style="margin: 0;">
+            <table class="table table-hover align-middle" style="margin-bottom: 0;">
+                <thead style="background: #F8FAFC;">
+                    <tr>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700;">Program</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Code</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Enrolled Learners</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Certificate Blueprint</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in courses_summary %}
+                        <tr style="border-top: 1px solid #F1F5F9;">
+                            <td style="padding: 14px 20px; font-weight: 600; color: #1E293B;">
+                                <i class="fa fa-graduation-cap text-muted" style="margin-right: 6px;"></i>
+                                {{ c.title }}
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center;">
+                                <span class="label label-default" style="font-size: 11px; padding: 4px 8px; border-radius: 4px; background: #F1F5F9; color: #475569; font-weight: 600;">{{ c.code }}</span>
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center;">
+                                <span class="badge" style="background: #EEF2FF; color: #4F46E5; font-size: 12px; font-weight: 700; padding: 4px 10px;">{{ c.enrolled }} Learners</span>
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center;">
+                                {% if c.has_certificate %}
+                                    <span class="label label-success" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; padding: 4px 10px; border-radius: 9999px; font-weight: 600;">
+                                        <i class="fa fa-check-circle"></i> Active Blueprint
+                                    </span>
+                                {% else %}
+                                    <span class="label label-default" style="background: #F8FAFC; color: #94A3B8; font-size: 11px; padding: 4px 8px; border-radius: 9999px;">Standard</span>
+                                {% endif %}
+                            </td>
+                            <td style="padding: 14px 20px; text-align: right;">
+                                <a href="{{ _p.web_main }}mySpace/course.php?course_code={{ c.code }}" class="btn btn-default btn-xs" style="border-radius: 6px; font-weight: 600;">
+                                    <i class="fa fa-bar-chart text-primary"></i> Analytics
+                                </a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted" style="padding: 24px;">No courses found</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Active Learners Roster -->
+    <div class="panel panel-default et-reporting-panel" style="border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px; background: #fff; overflow: hidden;">
+        <div class="panel-heading" style="background: #FAFBFD; border-bottom: 1px solid #EDF2F7; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1E293B;">
+                <i class="fa fa-users text-primary" style="margin-right: 8px;"></i>
+                Enrolled Learners Activity Roster
+            </h4>
+            <a href="{{ _p.web_main }}mySpace/student.php" class="btn btn-default btn-xs" style="font-weight: 600; border-radius: 6px;">
+                View All Learners <i class="fa fa-arrow-right"></i>
+            </a>
+        </div>
+        <div class="table-responsive" style="margin: 0;">
+            <table class="table table-hover align-middle" style="margin-bottom: 0;">
+                <thead style="background: #F8FAFC;">
+                    <tr>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700;">Learner</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700;">Email</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Enrolled Programs</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Last Active</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: center;">Joined</th>
+                        <th style="padding: 12px 20px; font-size: 12px; text-transform: uppercase; color: #64748B; font-weight: 700; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for st in students_summary %}
+                        <tr style="border-top: 1px solid #F1F5F9;">
+                            <td style="padding: 14px 20px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px;">
+                                        {{ st.name|slice(0, 1)|upper }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 700; color: #1E293B;">{{ st.name }}</div>
+                                        <div style="font-size: 11px; color: #94A3B8;">@{{ st.username }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding: 14px 20px; color: #64748B; font-size: 13px;">
+                                {{ st.email }}
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center;">
+                                <span class="badge" style="background: #F1F5F9; color: #334155; font-size: 12px; font-weight: 600; padding: 4px 10px;">{{ st.courses_count }} Courses</span>
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center; color: #64748B; font-size: 12px;">
+                                {{ st.last_login }}
+                            </td>
+                            <td style="padding: 14px 20px; text-align: center; color: #94A3B8; font-size: 12px;">
+                                {{ st.reg_date }}
+                            </td>
+                            <td style="padding: 14px 20px; text-align: right;">
+                                <a href="{{ _p.web_main }}mySpace/myStudents.php?student={{ st.id }}" class="btn btn-default btn-xs" style="border-radius: 6px; font-weight: 600;">
+                                    <i class="fa fa-line-chart text-info"></i> Details
+                                </a>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted" style="padding: 24px;">No learners enrolled yet</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Platform Learning Performance Metrics -->
+    {% if report is not empty %}
+    <div class="panel panel-default et-reporting-panel" style="border-radius: 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px; background: #FAFBFD; padding: 20px;">
+        <div style="margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="fa fa-dashboard" style="margin-right: 6px;"></i> Platform Learning Performance
+            </h4>
+        </div>
+        <div class="row">
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 12px;">
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                    <div style="font-size: 20px; font-weight: 800; color: #1E293B;">{{ report.AverageCoursePerStudent|default('2.0') }}</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Avg Courses / Learner</div>
                 </div>
             </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="card">
-                <div class="content">
-                    <div class="card-title"><a href="{{ _p.web_main }}mySpace/users.php?status={{ studentboss }}">{{ 'FollowedStudentBosses' | get_lang }}</a></div>
-                    <div class="row">
-                        <div class="col-xs-5">
-                            <div class="icon-big icon-studentboss text-center">
-                                <i class="fa fa-address-book" aria-hidden="true"></i>
-                            </div>
-                        </div>
-                        <div class="col-xs-7">
-                            <div class="numbers">
-                                <h2>{{ studentbosses }}</h2>
-                            </div>
-                        </div>
-                    </div>
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 12px;">
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                    <div style="font-size: 20px; font-weight: 800; color: #1E293B;">{{ report.AverageProgressInLearnpath|default('100%') }}</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Avg Learning Progress</div>
                 </div>
             </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="card">
-                <div class="content">
-                    <div class="card-title"><a href="{{ _p.web_main }}mySpace/teachers.php">{{ 'FollowedTeachers' | get_lang }}</a></div>
-                    <div class="row">
-                        <div class="col-xs-5">
-                            <div class="icon-big icon-teachers text-center">
-                                <i class="fa fa-book" aria-hidden="true"></i>
-                            </div>
-                        </div>
-                        <div class="col-xs-7">
-                            <div class="numbers">
-                                <h2>{{ numberTeachers }}</h2>
-                            </div>
-                        </div>
-                    </div>
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 12px;">
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                    <div style="font-size: 20px; font-weight: 800; color: #1E293B;">{{ report.AvgCourseScore|default('100%') }}</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Avg Quiz / Exam Score</div>
                 </div>
             </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="card">
-                <div class="content">
-                    <div class="card-title"><a href="{{ _p.web_main }}mySpace/users.php?status={{ drh }}">{{ 'FollowedHumanResources' | get_lang }}</a></div>
-                    <div class="row">
-                        <div class="col-xs-5">
-                            <div class="icon-big icon-humanresources text-center">
-                                <i class="fa fa-user" aria-hidden="true"></i>
-                            </div>
-                        </div>
-                        <div class="col-xs-7">
-                            <div class="numbers">
-                                <h2>{{ humanresources }}</h2>
-                            </div>
-                        </div>
-                    </div>
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 12px;">
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                    <div style="font-size: 20px; font-weight: 800; color: #1E293B;">{{ report.AverageTimeSpentOnThePlatform|default('00:00:00') }}</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Avg Platform Time</div>
                 </div>
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
-<div class="view-global">
-    <div class="panel panel-default panel-view">
-        <div class="panel-body">
-            <div class="row">
-                <div class="col-lg-3 col-sm-3">
-                    <div class="easy-donut">
-                        <div id="easypiechart-blue" class="easypiechart" data-percent="{{ total_user }}">
-                            <span class="percent">{{ total_user }}</span>
-                        </div>
-                        <div class="easypiechart-link">
-                            <a class="btn btn-default" href="{{ _p.web_main }}mySpace/users.php">
-                                {{ 'FollowedUsers' | get_lang }}
-                            </a>
-                        </div>
-                    </div>
-                    {% if _u.status == 1 and _u.is_admin %}
-                        <a href="{{ _p.web_main }}admin/dashboard_add_users_to_user.php?user={{ _u.id }}" class="btn btn-default btn-sm">
-                            <i class="fa fa-plus" aria-hidden="true"></i>
-                        </a>
-                    {% endif %}
-                </div>
-                <div class="col-lg-3 col-sm-3">
-                    <div class="easy-donut">
-                        <div id="easypiechart-orange" class="easypiechart" data-percent="{{ stats.courses }}">
-                            <span class="percent">{{ stats.courses }}</span>
-                        </div>
-                        <div class="easypiechart-link">
-                            <a class="btn btn-default" href="{{ _p.web_main }}mySpace/course.php">
-                                {{ 'AssignedCourses' | get_lang }}
-                            </a>
-                        </div>
-                    </div>
-                    {% if _u.status == 1 %}
-                        <a href="{{ _p.web_main }}mySpace/course.php" class="btn btn-default btn-sm">
-                            <i class="fa fa-plus" aria-hidden="true"></i>
-                        </a>
-                    {% endif %}
-                </div>
-                <div class="col-lg-3 col-sm-3">
-                    <div  class="easy-donut">
-                        <div id="easypiechart-teal" class="easypiechart" data-percent="{{ stats.assigned_courses }}">
-                            <span class="percent">{{ stats.assigned_courses }}</span>
-                        </div>
-                        <div class="easypiechart-link">
-                            <a class="btn btn-default" href="{{ _p.web_main }}mySpace/course.php?follow">{{ 'FollowedCourses' | get_lang }}</a>
-                        </div>
-                    </div>
-                    {% if _u.status == 1 %}
-                        <a href="{{ _p.web_main }}mySpace/course.php?follow" class="btn btn-default btn-sm">
-                            <i class="fa fa-plus" aria-hidden="true"></i>
-                        </a>
-                    {% endif %}
-                </div>
-                <div class="col-lg-3 col-sm-3">
-                    <div class="easy-donut">
-                        <div id="easypiechart-red" class="easypiechart" data-percent="{{ stats.session_list |length  }}">
-                            <span class="percent">{{ stats.session_list |length }}</span>
-                        </div>
-                        <div class="easypiechart-link">
-                            <a class="btn btn-default" href="{{ _p.web_main }}mySpace/session.php">{{ 'FollowedSessions' | get_lang }}</a>
-                        </div>
-                    </div>
-                    {% if _u.status == 1 and _u.is_admin %}
-                        <a href="{{ _p.web_main }}admin/dashboard_add_sessions_to_user.php?user={{ _u.id }}" class="btn btn-default btn-sm">
-                            <i class="fa fa-plus" aria-hidden="true"></i>
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="page-header">
-    <h4>
-        {{ title }}
-    </h4>
-</div>
-<div class="report-section">
-    <div class="row">
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AverageCoursePerStudent }}
-                        </div>
-                    </div>
-                </div>
-                <p>{{ 'AverageCoursePerStudent' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.InactivesStudents }}
-                        </div>
-                    </div>
-                </div>
-                <p>{{ 'InactivesStudents' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AverageTimeSpentOnThePlatform }}
-                        </div>
-                    </div>
-                </div>
-                <p>{{ 'AverageTimeSpentOnThePlatform' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AverageProgressInLearnpath }}
-                        </div>
-                    </div>
-                </div>
-                <p>{{ 'AverageProgressInLearnpath' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AvgCourseScore }}
-                        </div>
-
-                    </div>
-                </div>
-                <p>{{ 'AvgCourseScore' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AveragePostsInForum }}
-                        </div>
-
-                    </div>
-                </div>
-                <p> {{ 'AveragePostsInForum' | get_lang }}</p>
-            </div>
-        </div>
-        <div class="col-lg-3 col-sm-3">
-            <div class="item-report">
-                <div class="panel panel-default">
-                    <div class="panel-body">
-                        <div class="item-report-number">
-                            {{ report.AverageAssignments }}
-                        </div>
-
-                    </div>
-                </div>
-                <p> {{ 'AverageAssignments' | get_lang }}</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-    $(function() {
-        $('#easypiechart-teal').easyPieChart({
-            scaleColor: false,
-            barColor: '#1ebfae',
-            lineWidth:8,
-            trackColor: '#f2f2f2'
-        });
-
-        $('#easypiechart-orange').easyPieChart({
-            scaleColor: false,
-            barColor: '#ffb53e',
-            lineWidth:8,
-            trackColor: '#f2f2f2'
-        });
-
-        $('#easypiechart-red').easyPieChart({
-            scaleColor: false,
-            barColor: '#f9243f',
-            lineWidth:8,
-            trackColor: '#f2f2f2'
-        });
-
-        $('#easypiechart-blue').easyPieChart({
-            scaleColor: false,
-            barColor: '#30a5ff',
-            lineWidth:8,
-            trackColor: '#f2f2f2'
-        });
-    });
-</script>

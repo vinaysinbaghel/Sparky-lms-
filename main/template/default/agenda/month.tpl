@@ -1,1255 +1,638 @@
-{% set agenda_collective_invitations = 'agenda_collective_invitations'|api_get_configuration_value %}
-{% set agenda_event_subscriptions = 'agenda_event_subscriptions'|api_get_configuration_value %}
-{% set agenda_reminders = 'agenda_reminders'|api_get_configuration_value %}
-{% set career_in_global_events = 'allow_careers_in_global_agenda'|api_get_configuration_value %}
-
+{# Modern Responsive Unified FullCalendar View #}
 <style>
-.fc-day-grid-event > .fc-content {
-    white-space: normal;
+/* Modern Agenda & FullCalendar Styling */
+.et-calendar-page-wrapper {
+    max-width: 1260px;
+    margin: 15px auto 40px auto;
+    padding: 0 15px;
+    box-sizing: border-box;
+}
+
+.et-calendar-hero {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    color: #FFFFFF;
+    border-radius: 14px;
+    padding: 20px 26px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.et-calendar-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 4px 0;
+    color: #FFFFFF;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.et-calendar-subtitle {
+    color: #94A3B8;
+    font-size: 13px;
+    margin: 0;
+}
+
+.et-calendar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.et-btn-add-event {
+    background: #E3122B !important;
+    border: 1px solid #E3122B !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    padding: 8px 18px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    box-shadow: 0 4px 12px rgba(227, 18, 43, 0.3) !important;
+    transition: all 0.15s ease !important;
+    cursor: pointer !important;
+}
+
+.et-btn-add-event:hover {
+    background: #C20F23 !important;
+    border-color: #C20F23 !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(227, 18, 43, 0.4) !important;
+}
+
+.et-btn-list-view {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    transition: all 0.15s ease !important;
+    text-decoration: none !important;
+}
+
+.et-btn-list-view:hover {
+    background: rgba(255, 255, 255, 0.18) !important;
+    color: #FFFFFF !important;
+}
+
+/* Calendar Card Container */
+.et-calendar-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    padding: 22px 26px;
+    border: 1px solid #E2E8F0;
+}
+
+/* Legend Pill Bar */
+.et-calendar-legend-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #F8FAFC;
+    border: 1px solid #EDF2F7;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 12.5px;
+}
+
+.et-legend-items {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.et-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #475569;
+    font-weight: 600;
+}
+
+.et-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Controlled Grid Cell Height */
+.fc-basic-view .fc-body .fc-row {
+    min-height: 85px !important;
+}
+
+.fc-day-grid-container {
+    height: auto !important;
+}
+
+/* Clean Table Grid Borders */
+.fc-theme-standard td, .fc-theme-standard th, 
+.fc table, .fc td, .fc th {
+    border-color: #E2E8F0 !important;
+}
+
+/* Weekday Table Header */
+.fc-head-container thead th,
+.fc th.fc-day-header {
+    background: #F8FAFC !important;
+    color: #475569 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 10px 0 !important;
+    border-bottom: 1px solid #CBD5E1 !important;
+    text-align: center !important;
+}
+
+/* Day Numbers */
+.fc-day-number {
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    padding: 6px 8px !important;
+    float: right !important;
+    display: inline-block;
+}
+
+/* Hover on day cell */
+.fc-day:hover {
+    background: #F8FAFC !important;
+}
+
+/* Other month days */
+.fc-other-month {
+    background: #FAFAFC !important;
+}
+
+.fc-other-month .fc-day-number {
+    color: #CBD5E1 !important;
+}
+
+/* Today Highlight (modern, no yellow) */
+.fc-today {
+    background: #F0F9FF !important;
+}
+
+.fc-today .fc-day-number {
+    background: #E3122B;
+    color: #FFFFFF !important;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    margin: 3px 6px !important;
+    box-shadow: 0 2px 6px rgba(227, 18, 43, 0.35);
+}
+
+/* Event Badges Styling */
+.fc-event {
+    border-radius: 6px !important;
+    padding: 2px 6px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    cursor: pointer !important;
+    margin: 2px 3px !important;
+    line-height: 1.35 !important;
+    transition: all 0.15s ease !important;
+}
+
+.fc-event:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.fc-event .fc-time {
+    font-weight: 700 !important;
+    opacity: 0.95;
+    margin-right: 4px;
+}
+
+/* Toolbar Styling */
+.fc-toolbar {
+    margin-bottom: 16px !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.fc-toolbar .fc-center h2 {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    color: #0F172A !important;
+    letter-spacing: -0.02em;
+    margin: 0 !important;
+}
+
+.fc-button-group {
+    border-radius: 8px !important;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+
+.fc-button {
+    background: #FFFFFF !important;
+    color: #334155 !important;
+    border: 1px solid #CBD5E1 !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    padding: 6px 14px !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    outline: none !important;
+    transition: all 0.15s ease !important;
+}
+
+.fc-button:hover, .fc-button.fc-state-hover {
+    background: #F1F5F9 !important;
+    border-color: #94A3B8 !important;
+    color: #0F172A !important;
+}
+
+.fc-state-active, .fc-button.fc-state-active {
+    background: #0F172A !important;
+    color: #FFFFFF !important;
+    border-color: #0F172A !important;
+}
+
+/* Modal and Form Styling */
+.ui-dialog {
+    border-radius: 12px !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2) !important;
+    border: 1px solid #CBD5E1 !important;
+    background: #FFFFFF !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+
+.ui-dialog .ui-dialog-titlebar {
+    background: #0F172A !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 14px 20px !important;
+    font-weight: 700 !important;
+    font-size: 16px !important;
+}
+
+.ui-dialog .ui-dialog-titlebar-close {
+    background: transparent !important;
+    border: none !important;
+    color: #FFFFFF !important;
+    right: 15px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+}
+
+.ui-dialog .ui-dialog-content {
+    padding: 20px 24px !important;
+}
+
+.ui-dialog .ui-dialog-buttonpane {
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
+    margin: 0 !important;
+    padding: 12px 20px !important;
 }
 </style>
+
+<div class="et-calendar-page-wrapper">
+    <!-- Hero Banner Header -->
+    <div class="et-calendar-hero">
+        <div>
+            <h1 class="et-calendar-title">
+                <i class="fa fa-calendar-check-o" style="color: #818CF8;"></i> Personal Agenda & Schedule
+            </h1>
+            <p class="et-calendar-subtitle">
+                Track personal reminders, live class sessions, and platform announcements in one unified workspace.
+            </p>
+        </div>
+        <div class="et-calendar-actions">
+            <a href="agenda_list.php?type={{ type }}{% if _cid %}&{{ cid_req }}{% endif %}" class="et-btn-list-view">
+                <i class="fa fa-list"></i> Agenda List View
+            </a>
+            {% if can_add_events %}
+                <button type="button" class="btn et-btn-add-event" onclick="window.openAddNewEventModal();">
+                    <i class="fa fa-plus-circle"></i> Add Event
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Calendar Card Container -->
+    <div class="et-calendar-card">
+        <!-- Legend Pill Bar -->
+        <div class="et-calendar-legend-bar">
+            <div class="et-legend-items">
+                <span class="et-legend-item">
+                    <span class="et-legend-dot" style="background: #4F46E5;"></span> Personal Event
+                </span>
+                <span class="et-legend-item">
+                    <span class="et-legend-dot" style="background: #10B981;"></span> Course Session
+                </span>
+                <span class="et-legend-item">
+                    <span class="et-legend-dot" style="background: #E3122B;"></span> Platform Announcement
+                </span>
+            </div>
+            <div style="color: #64748B; font-size: 11.5px;">
+                <i class="fa fa-mouse-pointer"></i> Click any day to create an event, or click an existing event to view details.
+            </div>
+        </div>
+
+        <div id="calendar"></div>
+    </div>
+</div>
+
 <script>
-function checkLength( o, n, min, max ) {
-    if ( o.val().length > max || o.val().length < min ) {
-        o.addClass( "ui-state-error" );
-        /*updateTips( "Length of " + n + " must be between " +
-            min + " and " + max + "." );*/
-        return false;
-    } else {
-        return true;
-    }
-}
-function clean_user_select() {
-    //Cleans the selected attr
-    $("#users_to_send").val('').trigger("chosen:updated");
-}
+$(document).ready(function() {
+    var region_value = '{{ region_value }}';
+    var defaultStartDate = Cookies.get('agenda_cookies') ? JSON.parse(Cookies.get('agenda_cookies')).start : null;
+    var defaultView = Cookies.get('agenda_cookies') ? JSON.parse(Cookies.get('agenda_cookies')).view : '{{ default_view }}';
 
-var region_value = '{{ region_value }}';
-
-$(function() {
-    var cookieData = Cookies.getJSON('agenda_cookies');
-    var defaultView = (cookieData && cookieData.view) || '{{ default_view }}';
-    var defaultStartDate = (cookieData && cookieData.start) || moment.now();
-
-    // Reset button.
-    $('form#form-search #form-search_reset').on('click', function (e) {
-        e.preventDefault();
-
-        $("#session_id").val('0').selectpicker('refresh').trigger('change');
-    });
-
-	$("#dialog-form").dialog({
-		autoOpen : false,
-		modal : true,
-        position: { of: document },
-		width : 650,
-		height : 630,
-        zIndex : 20000 // added because of qtip2
-   	});
-
-    $("#simple-dialog-form").dialog({
-		autoOpen : false,
-        modal : true,
-        position: { of: document },
-		width : 650,
-		height : 630,
-        zIndex : 20000 // added because of qtip2
-   	});
-
-	var title = $("#title"),
-	content = $("#content"),
-	allFields = $([]).add( title ).add( content ), tips = $(".validateTips");
-
-    $("#select_form_id_search").change(function() {
-        var temp ="&user_id="+$("#select_form_id_search").val();
-        var position =String(window.location).indexOf("&user");
-        var url = String(window.location).substring(0,position)+temp;
-        if (position > 0) {
-            window.location.replace(url);
+    window.onEventScopeChange = function(scopeVal) {
+        if (!scopeVal) return;
+        if (scopeVal.indexOf('course_') === 0) {
+            $('#color_calendar').html('📚 Course Session').css('background-color', '#10B981').css('color', '#fff').css('padding', '3px 8px').css('border-radius', '4px');
+        } else if (scopeVal === 'platform') {
+            $('#color_calendar').html('📢 Platform Announcement').css('background-color', '#E3122B').css('color', '#fff').css('padding', '3px 8px').css('border-radius', '4px');
         } else {
-            url = String(window.location)+temp;
-            window.location.replace(url);
+            $('#color_calendar').html('👤 Personal Event').css('background-color', '#4F46E5').css('color', '#fff').css('padding', '3px 8px').css('border-radius', '4px');
         }
-    });
+    };
 
-    var CustomListViewGrid  = ListViewGrid.extend({
-        fgSegHtml: function(seg) {
-            var view = this.view;
-            var classes = [ 'fc-list-item' ].concat(this.getSegCustomClasses(seg));
-            var bgColor = this.getSegBackgroundColor(seg);
-            var event = seg.event;
-            var url = event.url;
-            var timeHtml;
-
-            if (event.allDay) {
-                timeHtml = view.getAllDayHtml();
-            }
-            else if (view.isMultiDayEvent(event)) { // if the event appears to span more than one day
-                if (seg.isStart || seg.isEnd) { // outer segment that probably lasts part of the day
-                    timeHtml = htmlEscape(this.getEventTimeText(seg));
-                }
-                else { // inner segment that lasts the whole day
-                    timeHtml = view.getAllDayHtml();
-                }
-            }
-            else {
-                // Display the normal time text for the *event's* times
-                timeHtml = htmlEscape(this.getEventTimeText(event));
-            }
-
-            if (url) {
-                classes.push('fc-has-url');
-            }
-
-            return '<tr class="' + classes.join(' ') + '">' +
-                (this.displayEventTime ?
-                    '<td class="fc-list-item-time ' + view.widgetContentClass + '">' +
-                        (timeHtml || '') +
-                    '</td>' :
-                    '') +
-                '<td class="fc-list-item-marker ' + view.widgetContentClass + '">' +
-                    '<span class="fc-event-dot"' +
-                    (bgColor ?
-                        ' style="background-color:' + bgColor + '"' :
-                        '') +
-                    '></span>' +
-                '</td>' +
-                '<td class="fc-list-item-title ' + view.widgetContentClass + '">' +
-                    '<a' + (url ? ' href="' + htmlEscape(url) + '"' : '') + '>' +
-                        htmlEscape(seg.event.title || '') + (seg.event.description || '')
-                    '</a>' +
-                '</td>' +
-            '</tr>';
-        },
-
-        // render the event segments in the view
-        renderSegList: function(allSegs) {
-            var segsByDay = this.groupSegsByDay(allSegs); // sparse array
-            var dayIndex;
-            var daySegs;
-            var i;
-            var tableEl = $('<table class="fc-list-table"><tbody/></table>');
-            var tbodyEl = tableEl.find('tbody');
-            var eventList = new Array;
-            for (dayIndex = 0; dayIndex < segsByDay.length; dayIndex++) {
-                daySegs = segsByDay[dayIndex];
-                if (daySegs) { // sparse array, so might be undefined
-                    this.sortEventSegs(daySegs);
-                    for (i = 0; i < daySegs.length; i++) {
-                        var event = daySegs[i].event;
-                        if (jQuery.inArray(event.id, eventList) !== -1) {
-                            continue;
-                        }
-                        eventList.push(event.id);
-                         // append a day header
-                        tbodyEl.append(this.dayHeaderHtml(
-                            this.view.start.clone().add(dayIndex, 'days'),
-                            event
-                        ));
-
-                        tbodyEl.append(daySegs[i].el); // append event row
-                    }
-                }
-            }
-
-            this.el.empty().append(tableEl);
-        },
-        // generates the HTML for the day headers that live amongst the event rows
-        dayHeaderHtml: function(dayDate, event) {
-            var view = this.view;
-            var mainFormat = 'LL';
-            var altFormat = 'dddd';
-            var checkIfSame = true;
-            if (event.end) {
-                checkIfSame = event.end.format(mainFormat) == dayDate.format(mainFormat);
-            }
-
-            return '<tr class="fc-list-heading" data-date="' + dayDate.format('YYYY-MM-DD') + '">' +
-                '<td class="' + view.widgetHeaderClass + '" colspan="3">' +
-                    (mainFormat ?
-                        view.buildGotoAnchorHtml(
-                            dayDate,
-                            { 'class': 'fc-list-heading-main' },
-                            htmlEscape(dayDate.format(mainFormat)) // inner HTML
-                        ) :
-                        '') +
-
-                      ((checkIfSame == false && mainFormat) ?
-                        view.buildGotoAnchorHtml(
-                            dayDate,
-                            { 'class': 'fc-list-heading-main' },
-                            '&nbsp;-&nbsp; ' + htmlEscape(event.end.format(mainFormat)) // inner HTML
-                        ) :
-                        '') +
-
-                    (altFormat ?
-                        view.buildGotoAnchorHtml(
-                            dayDate,
-                            { 'class': 'fc-list-heading-alt' },
-                            htmlEscape(dayDate.format(altFormat)) // inner HTML
-                        ) :
-                        '') +
-                '</td>' +
-            '</tr>';
-        },
-    });
-
-	var FC = $.fullCalendar; // a reference to FullCalendar's root namespace
-    var View = ListView;      // the class that all views must inherit from
-    var CustomView;          // our subclass
-
-    CustomView = View.extend({ // make a subclass of View
-        initialize: function() {
-            this.grid = new CustomListViewGrid(this);
-            this.scroller = new Scroller({
-                overflowX: 'hidden',
-                overflowY: 'auto'
-            });
+    window.openAddNewEventModal = function(start, end) {
+        if (!start) {
+            start = moment();
         }
-    });
+        if (!end) {
+            end = start.clone().add(1, 'hour');
+        }
 
-    FC.views.CustomView = CustomView; // register our class with the view system
-    var height = '';
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        height = 'auto';
-    }
+        // Format dates into local ISO strings for datetime-local
+        var startLocalStr = start.format('YYYY-MM-DDTHH:mm');
+        var endLocalStr = end.format('YYYY-MM-DDTHH:mm');
 
-	var calendar = $('#calendar').fullCalendar({
-        height: height,
-		header: {
-			left: 'today,prev,next',
-			center: 'title',
-			right: 'month,agendaWeek,agendaDay,CustomView'
-		},
-        views: {
-            CustomView: { // name of view
-                type: 'list',
-                buttonText: '{{ 'AgendaList' | get_lang | escape('js') }}',
-                duration: { month: 1 },
-                defaults: {
-                    'listDayAltFormat': 'dddd' // day-of-week is nice-to-have
+        $('#event_start_input').val(startLocalStr);
+        $('#event_end_input').val(endLocalStr);
+
+        $('#start_date').html(start.format('ll LT'));
+        $('#end_date').html(' - ' + end.format('LT'));
+
+        // Reset text fields
+        $('#title').val('').show();
+        $('#content').val('').show();
+        if ($('#comment').length) {
+            $('#comment').val('').show();
+        }
+
+        // Remove any view-only injected elements
+        $('#title_edit, #content_edit, #comment_edit').remove();
+
+        $('#cke_content').show();
+        if (window.CKEDITOR && CKEDITOR.instances['content']) {
+            CKEDITOR.instances['content'].setData('');
+        }
+
+        if ($('#event_scope').length) {
+            $('#event_scope').val('personal');
+            window.onEventScopeChange('personal');
+        }
+
+        $('#dialog-form').dialog('open');
+    };
+
+    window.saveAddEventForm = function() {
+        var titleVal = $.trim($('#title').val());
+        if (!titleVal) {
+            $('#title').addClass('ui-state-error').focus();
+            alert('Please enter a title for the event.');
+            return false;
+        }
+        $('#title').removeClass('ui-state-error');
+
+        if (window.CKEDITOR) {
+            for (var instance in CKEDITOR.instances) {
+                if (CKEDITOR.instances[instance]) {
+                    CKEDITOR.instances[instance].updateElement();
                 }
+            }
+        }
+
+        var $btn = $('#add_event_submit_btn');
+        var originalBtnHtml = $btn.html();
+        $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+
+        var postData = $('#add_event_form').serialize();
+        var submitUrl = '{{ _p.web_ajax }}agenda.ajax.php?a=add_event&type={{ type }}';
+
+        $.ajax({
+            url: submitUrl,
+            type: 'POST',
+            data: postData,
+            dataType: 'json',
+            success: function(resp) {
+                $btn.prop('disabled', false).html(originalBtnHtml);
+                $('#dialog-form').dialog('close');
+                $('#calendar').fullCalendar('refetchEvents');
+                $('#calendar').fullCalendar('rerenderEvents');
             },
-            month: {
-                'displayEventEnd' : true
+            error: function(xhr) {
+                $btn.prop('disabled', false).html(originalBtnHtml);
+                // Fallback attempt with refetch
+                $('#calendar').fullCalendar('refetchEvents');
+                $('#dialog-form').dialog('close');
             }
+        });
+
+        return false;
+    };
+
+    // Initialize Dialog Form for adding events
+    $('#dialog-form').dialog({
+        autoOpen: false,
+        modal: true,
+        position: { my: "center", at: "center", of: window },
+        width: 680,
+        height: 640,
+        zIndex: 20000
+    });
+
+    // Initialize Details Dialog for viewing/deleting events
+    $('#simple-dialog-form').dialog({
+        autoOpen: false,
+        modal: true,
+        position: { my: "center", at: "center", of: window },
+        width: 620,
+        height: 520,
+        zIndex: 20000
+    });
+
+    $(document).on('submit', '#add_event_form', function(e) {
+        e.preventDefault();
+        window.saveAddEventForm();
+        return false;
+    });
+
+    // Initialize FullCalendar with controlled height and elegant proportions
+    var calendar = $('#calendar').fullCalendar({
+        header: {
+            left: 'today prev,next',
+            center: 'title',
+            right: 'month,agendaWeek,agendaDay'
         },
+        buttonText: {
+            today: 'Today',
+            month: 'Month',
+            week: 'Week',
+            day: 'Day'
+        },
+        aspectRatio: 1.85,
+        contentHeight: 600,
+        fixedWeekCount: false,
         locale: region_value,
-        {% if use_google_calendar == 1 %}
-            eventSources: [
-                // if you want to add more just add URL in this array
-                '{{ google_calendar_url }}',
-                {
-                    className: 'gcal-event' // an option!
-                }
-            ],
-        {% endif %}
         defaultView: defaultView,
         defaultDate: defaultStartDate,
         firstHour: 8,
         firstDay: 1,
-        {% if fullcalendar_settings %}
-            {{ fullcalendar_settings  }}
-        {% endif %}
-        selectable	: true,
-		selectHelper: true,
-        viewDisplay: function(view) {
-            /* When changing the view update the qtips */
-            /*var api = $('.qtip').qtip('api'); // Access the API of the first tooltip on the page
-            if (api) {
-                api.destroy();
-                //api.render();
-            }*/
-        },
+        selectable: true,
+        selectHelper: true,
         viewRender: function(view, element) {
             var data = {
                 'view': view.name,
-                'start': view.intervalStart.format("YYYY-MM-DD")
+                'start': view.intervalStart.format('YYYY-MM-DD')
             };
-            Cookies.set('agenda_cookies', data, { expires: 1{% if is_https %}, secure: true{% endif %} }); // Expires 1 day
+            Cookies.set('agenda_cookies', data, { expires: 1 });
         },
-		// Add event
-		select: function(start, end, jsEvent, view) {
-            var diffDays = moment(end).diff(start, 'days');
-
-            var allDay = true;
-            if (end.hasTime()) {
-                allDay = false;
+        select: function(start, end, jsEvent, view) {
+            window.openAddNewEventModal(start, end);
+        },
+        eventClick: function(calEvent, jsEvent, view) {
+            // Show Event Details in #simple-dialog-form
+            var scopeBadge = '<span class="label" style="background:#4F46E5; color:#fff; padding:4px 8px; border-radius:4px; font-weight:700;">Personal Event</span>';
+            if (calEvent.type === 'course') {
+                var cName = calEvent.course_name || 'Course Session';
+                scopeBadge = '<span class="label" style="background:#10B981; color:#fff; padding:4px 8px; border-radius:4px; font-weight:700;"><i class="fa fa-graduation-cap"></i> ' + cName + '</span>';
+            } else if (calEvent.type === 'admin') {
+                scopeBadge = '<span class="label" style="background:#E3122B; color:#fff; padding:4px 8px; border-radius:4px; font-weight:700;"><i class="fa fa-bullhorn"></i> Platform Announcement</span>';
             }
 
-			$('#visible_to_input').show();
-			$('#add_as_announcement_div').show();
-			$('#visible_to_read_only').hide();
+            var startStr = calEvent.start ? calEvent.start.format('LLLL') : '';
+            var endStr = calEvent.end ? (' &ndash; ' + calEvent.end.format('LLLL')) : '';
 
-			// Cleans the selected attr
-		    clean_user_select();
+            var detailsHtml = '<div style="padding: 10px 0;">' +
+                '<div style="margin-bottom: 12px;">' + scopeBadge + '</div>' +
+                '<h3 style="margin: 0 0 10px 0; color: #0F172A; font-weight: 800; font-size: 20px;">' + calEvent.title + '</h3>' +
+                '<div style="font-size: 13.5px; color: #64748B; margin-bottom: 16px; font-weight: 600;">' +
+                    '<i class="fa fa-clock-o text-muted"></i> ' + startStr + endStr +
+                '</div>' +
+                '<div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 14px; color: #334155; line-height: 1.6;">' +
+                    (calEvent.description || '<em class="text-muted">No additional description provided.</em>') +
+                '</div>';
 
-            // Sets the 1st item selected by default
-            $('#users_to_send option').eq(0).attr('selected', 'selected');
-
-			// Update chz-select
-			//$("#users_to_send").trigger("chosen:updated");
-			if ({{ can_add_events }} == 1) {
-			    var startEn = start.clone().locale('en'),
-                    endEn = end.clone().locale('en');
-
-				var url = '{{ web_agenda_ajax_url }}&a=add_event&start='+startEn.format("YYYY-MM-DD HH:mm:00")+'&end='+endEn.format("YYYY-MM-DD HH:mm:00")+'&all_day='+allDay+'&view='+view.name;
-			    var start_date_value = start.format('{{ js_format_date }}');
-                $('#start_date').html(start_date_value);
-
-                if (diffDays > 1) {
-                    $('#start_date').html('');
-                    var end_date_value = '';
-                    if (end) {
-                        var clone = end.clone();
-                        end_date_value = clone.subtract(1, 'days').format('{{ js_format_date }}');
-                    }
-                    $('#end_date').html(start_date_value + " - " + end_date_value);
-                } else if (diffDays == 0) {
-                    var start_date_value = start.format('ll');
-                    var startTime = start.format('LT');
-                    var endTime = end.format('LT');
-                    $('#start_date').html('');
-                    $('#end_date').html(start_date_value + " (" + startTime + " - " + endTime+") ");
-                } else {
-                    $('#end_date').html('');
-                }
-
-				$('#color_calendar')
-                    .html('{{ type_label | escape('js')}}')
-                    .removeClass('group_event')
-                    .addClass('label_tag')
-                    .addClass('{{ type_event_class | escape('js') }}')
-                    .css('background-color', '{{ type_event_color }}');
-
-                //It shows the CKEDITOR while Adding an Event
-                $('#cke_content').show();
-                //It Fixing a minor bug with textarea ckeditor.remplace
-                $('#content').css('display','none');
-
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    $("#form_invitees").show().next().show();
-                    $('#form_invitees_edit').hide();
-                    $('#collective').prop('checked', false).show();
-                {% endif %}
-
-                {% if career_in_global_events %}
-                    $('#career_id, #promotion_id').parent().show();
-                    $('#form_career_id_edit, #form_promotion_id_edit').text('').hide();
-                {% endif %}
-
-                //Reset the CKEditor content that persist in memory
-                CKEDITOR.instances['content'].setData('');
-				allFields.removeClass("ui-state-error");
-
-                $('#add_event_form').get(0).reset();
-
-                {% if agenda_event_subscriptions and 'personal' == type and api_is_platform_admin() %}
-                    $('#form_subscription_visibility').trigger('change').selectpicker('refresh');
-                    $('#form_subscriptions_container').show('');
-                    $('#form_subscriptions_edit').hide().html('');
-                {% endif %}
-
-                {% if 'personal' == type and agenda_collective_invitations and (agenda_event_subscriptions and api_is_platform_admin()) %}
-                    $('#invitation_type-group').show();
-                    $('#invitations-block, #subscriptions-block').hide();
-                {% endif %}
-
-				$("#dialog-form").dialog("open");
-				$("#dialog-form").dialog({
-					buttons: {
-						'{{ "Add" | get_lang }}' : function() {
-							var bValid = true;
-							bValid = bValid && checkLength(title, "title", 1, 255);
-
-                            //Update the CKEditor Instance to the remplaced textarea, ready to be serializable
-                            for ( instance in CKEDITOR.instances ) {
-                                CKEDITOR.instances[instance].updateElement();
-                            }
-
-							var params = $("#add_event_form").serialize();
-
-							$.ajax({
-								url: url+'&'+params,
-								success:function(data) {
-									var user = $('#users_to_send').val();
-                                    if (user) {
-                                        if (user.length > 1) {
-                                            user = 0;
-                                        } else {
-                                            user = user[0];
-                                        }
-                                        var user_length = String(user).length;
-                                        if (String(user).substring(0,1) == 'G') {
-                                            var user_id = String(user).substring(6,user_length);
-                                            var user_id = "G:"+user_id;
-                                        } else {
-                                            var user_id = String(user).substring(5,user_length);
-                                        }
-                                        var temp = "&user_id="+user_id;
-                                        var position = String(window.location).indexOf("&user");
-                                        var url = String(window.location).substring(0, position)+temp;
-                                        /*if (position > 0) {
-                                            window.location.replace(url);
-                                        } else {
-                                            url = String(window.location)+temp;
-                                            window.location.replace(url);
-                                        }*/
-                                    }
-
-                                    $("#title").val('');
-                                    $("#content").val('');
-                                    $("#comment").val('');
-
-                                    {% if agenda_collective_invitations and 'personal' == type %}
-                                        $("#form_invitees").val(null).trigger('change');
-                                        $('#collective').prop('checked', false);
-                                    {% endif %}
-
-                                    calendar.fullCalendar('refetchEvents');
-                                    calendar.fullCalendar('rerenderEvents');
-
-									$("#dialog-form").dialog('close');
-								}
-							});
-						}
-					},
-					close: function() {
-                        $("#title").val('');
-                        $("#content").val('');
-                        $("#comment").val('');
-
-                        {% if agenda_collective_invitations and 'personal' == type %}
-                            $("#form_invitees").val(null).trigger('change');
-                            $('#collective').prop('checked', false);
-                        {% endif %}
-					}
-				});
-
-				calendar.fullCalendar('unselect');
-                //Reload events
-                calendar.fullCalendar("refetchEvents");
-                calendar.fullCalendar("rerenderEvents");
-			}
-		},
-		eventRender: function(event, element) {
-            if (event.attachment) {
-                /*element.qtip({
-                    hide: {
-                        delay: 2000
-                    },
-		            content: event.attachment,
-		            position: { at:'top right' , my:'bottom right'}
-		        }).removeData('qtip'); // this is an special hack to add multiple qtip in the same target
-		        */
+            if (calEvent.comment) {
+                detailsHtml += '<div style="font-size: 13px; color: #64748B; margin-bottom: 12px;"><strong>Note:</strong> ' + calEvent.comment + '</div>';
             }
 
-            var onHoverInfo = '';
-            {% if on_hover_info.description %}
-                if (event.description) {
-                    onHoverInfo = event.description;
-                }
-            {% endif %}
+            detailsHtml += '<div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">' +
+                '<button type="button" class="btn btn-default" onclick="$(\'#simple-dialog-form\').dialog(\'close\');" style="font-weight:600; border-radius:6px;">Close</button>';
 
-            {% if on_hover_info.comment %}
-                if (event.comment) {
-                    onHoverInfo = onHoverInfo + event.comment;
-                }
-            {% endif %}
+            // Permission check: users can only delete their OWN personal events; non-admins cannot delete course or admin/platform events
+            var canDeleteEvent = false;
+            var currentUserId = {{ _u.id|default(_u.user_id)|default(0) }};
+            var isPlatformAdmin = {{ _u.is_admin ? 'true' : 'false' }};
 
-            if (onHoverInfo) {
-                element.qtip({
-                    content: onHoverInfo,
-                    position: {
-                        at: 'top center',
-                        my: 'bottom center',
-                        viewport: $(window)
-                    }
-                });
-			}
-	    },
-		eventClick: function(calEvent, jsEvent, view) {
-            var start = calEvent.start;
-            var end = calEvent.end;
-            var diffDays = moment(end).diff(start, 'days');
-            var endDateMinusOne = '';
-
-            // If event is not editable then just return the qtip
-            if (!calEvent.editable) {
-                var onHoverInfo = '';
-                {% if calEvent.description %}
-                if (calEvent.description) {
-                    onHoverInfo = calEvent.description;
-                }
-                {% endif %}
-                {% if on_hover_info.comment %}
-                if (calEvent.comment) {
-                    onHoverInfo = onHoverInfo + calEvent.comment;
-                }
-                {% endif %}
-
-                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                    $(this).qtip({
-                        overwrite: false,
-                        show: {ready: true},
-                        content: onHoverInfo,
-                        position: {
-                            at: 'top center',
-                            my: 'bottom center',
-                            viewport: $(window)
-                        }
-                    });
-
-                    return;
+            if (isPlatformAdmin) {
+                canDeleteEvent = true;
+            } else if (calEvent.type === 'personal') {
+                if (calEvent.user_id && calEvent.user_id == currentUserId) {
+                    canDeleteEvent = true;
+                } else if (calEvent.editable && (!calEvent.user_id || calEvent.user_id == currentUserId)) {
+                    canDeleteEvent = true;
                 }
             }
 
-            if (end) {
-                var clone = end.clone();
-                endDateMinusOne = clone.subtract(1, 'days').format('{{ js_format_date }}');
+            if (canDeleteEvent) {
+                detailsHtml += '<button type="button" class="btn btn-danger" id="delete_modal_event_btn" style="background:#E3122B; border-color:#E3122B; font-weight:700; border-radius:6px;"><i class="fa fa-trash"></i> Delete Event</button>';
             }
-            var startDateToString = start.format("{{ js_format_date }}");
 
-            var delete_url = '{{ web_agenda_ajax_url }}&a=delete_event&id='+calEvent.id;
+            detailsHtml += '</div></div>';
 
-            $('#invitations-block, #subscriptions-block').hide();
+            $('#simple-dialog-form').html(detailsHtml);
+            $('#simple-dialog-form').dialog('open');
 
-			// Edit event.
-			if (calEvent.editable) {
-                $('#invitation_type-group').hide();
-
-				$('#visible_to_input').hide();
-                $('#add_as_announcement_div').hide();
-                {% if type != 'admin' %}
-                    $('#visible_to_read_only').show();
-                    $("#visible_to_read_only_users").html(calEvent.sent_to);
-				{% endif %}
-
-                $('#color_calendar').html('{{ type_label | escape('js') }}');
-                $('#color_calendar').addClass('label_tag');
-                $('#color_calendar').removeClass('course_event');
-                $('#color_calendar').removeClass('personal_event');
-                $('#color_calendar').removeClass('group_event');
-                $('#color_calendar').addClass(calEvent.type+'_event');
-
-                // It hides the CKEDITOR while clicking an existing Event
-                $('#cke_content').hide();
-                $('#start_date').html(startDateToString);
-                if (diffDays > 1) {
-                    $('#end_date').html(' - ' + endDateMinusOne);
-                } else if (diffDays == 0) {
-                    var start_date_value = start.format('ll');
-                    var startTime = start.format('LT');
-                    var endTime = end.format('LT');
-                    $('#start_date').html('');
-                    $('#end_date').html(start_date_value + " (" + startTime + " - " + endTime+") ");
-                } else {
-                    $('#end_date').html('');
-                }
-
-                if ($("#title").parent().find('#title_edit').length == 0) {
-                    $("#title").parent().append('<p id="title_edit" class="form-control-static"></p>');
-                }
-
-                $("#title_edit").html(calEvent.title);
-
-                if ($("#content").parent().find('#content_edit').length == 0) {
-                    $("#content").parent().append('<div id="content_edit" class="form-control-static"></div>');
-                }
-                $("#content_edit").html(calEvent.description);
-
-                if ($("#comment").parent().find('#comment_edit').length == 0) {
-                    $("#comment").parent().append('<p id="comment_edit" class="form-control-static"></p>');
-                }
-
-                if (calEvent.course_name) {
-                    $("#calendar_course_info").html(
-                        '<div class="form-group"><label class="col-sm-2 control-label">{{ 'Course' | get_lang }}</label>' +
-                        '<div class="class="col-sm-8">' + calEvent.course_name+"</div></div>"
-                    );
-                } else {
-                    $("#calendar_course_info").html('');
-                }
-
-                if (calEvent.session_name) {
-                    $("#calendar_session_info").html(
-                        '<div class="form-group"><label class="col-sm-2 control-label">{{ 'Session' | get_lang }}</label>'+
-                        '<div class="class="col-sm-8"><p class="form-control-static">' + calEvent.session_name + "</p></div></div>"
-                    );
-                } else {
-                    $("#calendar_session_info").html('');
-                }
-
-                if (calEvent.comment != '') {
-                    $("#comment_edit").html(calEvent.comment);
-                    $("#comment_edit").show();
-                }
-
-                if (calEvent.attachment != '') {
-                    $("#attachment_text").html(calEvent.attachment);
-                    $("#attachment_block").show();
-                    $("#attachment_text").show();
-                }
-
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    if ($("#form_invitees").parent().find('#form_invitees_edit').length == 0) {
-                        $("#form_invitees").parent().append('<div id="form_invitees_edit"></div>');
-                    }
-
-                    if ($("#collective").parent().find('#collective_edit').length == 0) {
-                        $("#collective").parent().append('<div id="collective_edit"></div>');
-                    }
-                {% endif %}
-
-                {% if agenda_event_subscriptions and 'personal' == type and api_is_platform_admin() %}
-                    $('#form_subscriptions_container').hide();
-                    $('#form_subscriptions_edit')
-                        .html(showSubcriptionsContainer(calEvent))
-                        .show();
-                {% endif %}
-
-                {% if agenda_reminders %}
-                    $('#notification_list').html('').next('.form-group').hide();
-
-                    $('#notification_list').append("<strong>{{ 'NotifyBeforeTheEventStarts'|get_lang }}</strong><br>");
-
-                    calEvent.reminders.forEach(function (reminder) {
-                        var reminderText = '<span class="fa fa-bell-o" aria-hidden="true"></span> ' + reminder.date_interval[0] + ' ';
-
-                        switch (reminder.date_interval[1]) {
-                            case 'i':
-                                reminderText += "{{ 'Minutes'|get_lang }}";
-                                break;
-                            case 'h':
-                                reminderText += "{{ 'Hours'|get_lang }}";
-                                break;
-                            case 'd':
-                            default:
-                                reminderText += "{{ 'Days'|get_lang }}";
-                                break;
-                        }
-
-                        reminderText += '<br>';
-
-                        $('#notification_list').append(reminderText);
-                    });
-                {% endif %}
-
-                {% if career_in_global_events %}
-                    $('select#promotion_id').on('refreshed.bs.select', function () {
-                        $('select#promotion_id').val(function () {
-                            if (calEvent.promotion
-                                && calEvent.career
-                                && $('select#career_id').val() == calEvent.career.id
-                            ) {
-                                return calEvent.promotion.id;
-                            }
-
-                            return '0';
-                        }).trigger('change');
-                    });
-
-                    $('select#career_id').val(function () {
-                        if (calEvent.career) {
-                            return calEvent.career.id;
-                        }
-
-                        return '';
-                    }).trigger('change');
-                {% endif %}
-
-                $("#title_edit").show();
-                $("#content_edit").show();
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    $('#form_invitees_edit')
-                        .html(function () {
-                            if (!calEvent.invitees) {
-                                return '';
-                            }
-
-                            $('#invitation_type-group').hide()
-                            $('#invitations-block').show();
-
-                            return calEvent.invitees
-                                .map(function (invitee) { return invitee.name; })
-                                .join('<br>');
-                        })
-                        .show();
-                {% endif %}
-
-                {% if career_in_global_events %}
-                    var $careerFieldParent = $('#career_id').parents('.col-sm-8');
-                    var $promotionFieldParent = $('#promotion_id').parents('.col-sm-8');
-
-                    if ($careerFieldParent.find('#form_career_id_edit').length === 0) {
-                        $careerFieldParent.append('<p id="form_career_id_edit" class="form-control-static"></p>');
-                    }
-
-                    if ($promotionFieldParent.find('#form_promotion_id_edit').length === 0) {
-                        $promotionFieldParent.append('<p id="form_promotion_id_edit" class="form-control-static"></p>');
-                    }
-
-                    $('#form_career_id_edit, #form_promotion_id_edit').text('');
-                    $('#career_id, #promotion_id').parent().hide();
-
-                    if (calEvent.career && 'admin' === calEvent.type) {
-                        $('#form_career_id_edit').text(calEvent.career.name).show();
-                        $('#promotion').show();
-                        $('#form_promotion_id_edit').text('{{ 'All'|get_lang|escape('js') }}').show();
-                    }
-
-                    if (calEvent.promotion && 'admin' === calEvent.type) {
-                        $('#form_promotion_id_edit').text(calEvent.promotion.name);
-                    }
-                {% endif %}
-
-                $("#title").hide();
-                $("#content").hide();
-                $("#comment").hide();
-
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    $("#form_invitees").hide().next().hide();
-                    $('#collective').hide();
-                {% endif %}
-
-				allFields.removeClass( "ui-state-error" );
-				$("#dialog-form").dialog("open");
-
-				var url = '{{ web_agenda_ajax_url }}&a=edit_event&id='+calEvent.id+'&view='+view.name;
-
-				$("#dialog-form").dialog({
-					buttons: {
-// Reduced options to simplify interface
-/*
-                        '{{ "ExportiCalConfidential"|get_lang }}' : function() {
-                            url =  "{{ _p.web_main }}calendar/ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=confidential";
-                            window.location.href = url;
-						},
-						'{{ "ExportiCalPrivate"|get_lang }}': function() {
-                            url =  "{{ _p.web_main }}calendar/ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=private";
-                            window.location.href = url;
-						},
-*/
-                        '{{ "ExportiCalPublic"|get_lang }}': function() {
-                            url =  "{{ _p.web_main }}calendar/ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=public";
-                            window.location.href = url;
-						},
-                        {% if type == 'not_available' %}
-						'{{ "Edit" | get_lang }}' : function() {
-							var bValid = true;
-							bValid = bValid && checkLength( title, "title", 1, 255 );
-
-							var params = $("#add_event_form").serialize();
-							$.ajax({
-								url: url+'&'+params,
-								success:function() {
-									calEvent.title = $("#title").val();
-									calEvent.start = calEvent.start;
-									calEvent.end = calEvent.end;
-									calEvent.allDay = calEvent.allDay;
-									calEvent.description = $("#content").val();
-									calendar.fullCalendar('updateEvent',
-                                        calEvent,
-                                        true // make the event "stick"
-									);
-									$("#dialog-form").dialog("close");
-								}
-							});
-						},
-                        {% endif %}
-                        '{{ "Edit"|get_lang }}' : function() {
-                            url =  "{{ _p.web_main }}calendar/agenda.php?action=edit&type=fromjs&id="+calEvent.id+'&course_id='+calEvent.course_id+"";
-                            if (typeof calEvent.group_id != "undefined" && {{ group_id }} != 0) {
-                              url = url + '&gidReq=' + calEvent.group_id;
-                            }
-                            window.location.href = url;
-                            $("#dialog-form").dialog( "close" );
+            $('#delete_modal_event_btn').on('click', function() {
+                if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+                    var delBtn = $(this);
+                    delBtn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Deleting...');
+                    $.ajax({
+                        url: '{{ _p.web_ajax }}agenda.ajax.php?a=delete_event&id=' + calEvent.id,
+                        type: 'POST',
+                        dataType: 'json',
+                        success: function() {
+                            $('#simple-dialog-form').dialog('close');
+                            $('#calendar').fullCalendar('refetchEvents');
+                            $('#calendar').fullCalendar('rerenderEvents');
                         },
-						'{{ "Delete"|get_lang }}': function() {
-                            if (calEvent.parent_event_id || calEvent.has_children != '') {
-                                var newDiv = $('<div>');
-                                newDiv.dialog({
-                                    modal: true,
-                                    title: "{{ 'DeleteThisItem' | get_lang }}",
-                                    buttons: []
-                                });
-
-                                var buttons = newDiv.dialog("option", "buttons");
-
-                                if (calEvent.has_children == '0') {
-                                    buttons.push({
-                                        text: '{{ "DeleteThisItem" | get_lang }}',
-                                        click: function() {
-                                            $.ajax({
-                                                url: delete_url,
-                                                success:function() {
-                                                    calendar.fullCalendar('removeEvents',
-                                                        calEvent
-                                                    );
-                                                    calendar.fullCalendar("refetchEvents");
-                                                    calendar.fullCalendar("rerenderEvents");
-                                                    $("#dialog-form").dialog("close");
-                                                    newDiv.dialog( "destroy" );
-                                                }
-                                            });
-                                        }
-                                    });
-                                    newDiv.dialog("option", "buttons", buttons);
-                                }
-
-                                var buttons = newDiv.dialog("option", "buttons");
-                                buttons.push({
-                                    text: '{{ "DeleteAllItems" | get_lang }}',
-                                    click: function() {
-                                        $.ajax({
-                                            url: delete_url+'&delete_all_events=1',
-                                            success:function() {
-                                                calendar.fullCalendar('removeEvents',
-                                                    calEvent
-                                                );
-                                                calendar.fullCalendar('refetchEvents');
-                                                calendar.fullCalendar('rerenderEvents');
-                                                $("#dialog-form").dialog('close');
-                                                newDiv.dialog( "destroy" );
-                                            }
-                                        });
-                                    }
-                                });
-                                newDiv.dialog("option", "buttons", buttons);
-
-                                return true;
-                            }
-
-							$.ajax({
-								url: delete_url,
-								success:function() {
-									calendar.fullCalendar('removeEvents',
-										calEvent
-									);
-									calendar.fullCalendar('refetchEvents');
-									calendar.fullCalendar('rerenderEvents');
-									$("#dialog-form").dialog('close');
-								}
-							});
-						},
-                                    {% if (agenda_collective_invitations or agenda_event_subscriptions) and 'personal' == type %}
-                                        '{{ "ExportUsers" | get_lang }}' : function() {
-                                            if (isInvitation(calEvent)) {
-                                                url =  "{{ _p.web_main }}calendar/exportEventMembers.php?a=export_invitees&id=" + calEvent.id;
-                                            } else {
-                                                url =  "{{ _p.web_main }}calendar/exportEventMembers.php?a=export_subscribers&id=" + calEvent.id;
-                                            }
-                                            window.location.href = url;
-                                        },
-                                    {% endif %}
-
-					},
-					close: function() {
-                        $("#title_edit").hide();
-                        $("#content_edit").hide();
-                        $("#comment_edit").hide();
-                        $("#attachment_block").hide();
-                        $("#attachment_text").hide();
-                        {% if agenda_collective_invitations and 'personal' == type %}
-                            $('#form_invitees_edit').hide();
-                            $('#collective_edit').hide();
-                        {% endif %}
-
-                        $("#title").show();
-                        $("#content").show();
-                        $("#comment").show();
-                        {% if agenda_collective_invitations and 'personal' == type %}
-                            $("#form_invitees").show().next().show();
-                            $('#collective').show();
-                        {% endif %}
-
-						$("#title_edit").html('');
-						$("#content_edit").html('');
-                        $("#comment_edit").html('');
-                        $("#attachment_text").html('');
-
-                        $("#title").val('');
-                        $("#content").val('');
-                        $("#comment").val('');
-                        {% if agenda_collective_invitations and 'personal' == type %}
-                            $("#form_invitees").val(null).trigger('change');
-                            $('#collective').prop('checked', false);
-                        {% endif %}
-
-                        $('#notification_list').html('').next('.form-group').show();
-					}
-				});
-			} else {
-                $('#invitation_type-group').show();
-
-			    // Simple form
-                $('#simple_start_date').html(startDateToString);
-                if (diffDays > 1) {
-                    $('#simple_end_date').html(' - ' + endDateMinusOne);
-                } else if (diffDays == 0) {
-                    var start_date_value = start.format('ll');
-                    var startTime = start.format('LT');
-                    var endTime = end.format('LT');
-                    $('#simple_start_date').html('');
-                    $('#simple_end_date').html(start_date_value + " (" + startTime + " - " + endTime+") ");
-                } else {
-                    $('#simple_end_date').html('');
-                }
-
-                if (calEvent.course_name) {
-                    $("#calendar_course_info_simple").html(
-                        '<div class="form-group"><label class="col-sm-3 control-label">{{ 'Course' | get_lang }}</label>' +
-                        '<div class="col-sm-9"><p class="form-control-static">' + calEvent.course_name+"</p></div></div>"
-                    );
-                } else {
-                    $("#calendar_course_info_simple").html('');
-                }
-
-                if (calEvent.session_name) {
-                    $("#calendar_session_info").html(
-                        '<div class="form-group"><label class="col-sm-3 control-label">{{ 'Session' | get_lang }}</label>' +
-                        '<div class="col-sm-9">' + calEvent.session_name+"</div></div>"
-                    );
-                } else {
-                    $("#calendar_session_info").html('');
-                }
-
-                $("#simple_title").html(calEvent.title);
-                $("#simple_content").html(calEvent.description);
-                $("#simple_comment").html(calEvent.comment);
-                $("#simple_attachment").html(calEvent.attachment);
-
-                {% if agenda_reminders %}
-                $('#simple_notification_list').html('').append("<strong>{{ 'NotifyBeforeTheEventStarts'|get_lang }}</strong><br>");
-
-                calEvent.reminders.forEach(function (reminder) {
-                    var reminderText = '<span class="fa fa-bell-o" aria-hidden="true"></span> ' + reminder.date_interval[0] + ' ';
-
-                    switch (reminder.date_interval[1]) {
-                        case 'i':
-                            reminderText += "{{ 'Minutes'|get_lang }}";
-                            break;
-                        case 'h':
-                            reminderText += "{{ 'Hours'|get_lang }}";
-                            break;
-                        case 'd':
-                        default:
-                            reminderText += "{{ 'Days'|get_lang }}";
-                            break;
-                    }
-
-                    reminderText += '<br>';
-
-                    $('#simple_notification_list').append(reminderText);
-                });
-                {% endif %}
-
-                {% if career_in_global_events %}
-                    $('#simple_career_field').hide();
-                    $('#simple_promotion_field').hide();
-                    $('#simple_career').html();
-                    $('#simple_promotion').html('{{ 'All'|get_lang|escape('js') }}');
-
-                    if (calEvent.career) {
-                        $('#simple_career_field').show();
-                        $('#simple_promotion_field').show();
-                        $('#simple_career').html(calEvent.career.name);
-                    }
-
-                    if (calEvent.promotion) {
-                        $('#simple_promotion').html(calEvent.promotion.name);
-                    }
-                {% endif %}
-
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    $('#simple_invitees').html(function () {
-                        if (!calEvent.invitees) {
-                            return '';
+                        error: function() {
+                            $('#simple-dialog-form').dialog('close');
+                            $('#calendar').fullCalendar('refetchEvents');
                         }
-
-                        $('#invitation_type-group').hide();
-                        $('#invitations-block').show();
-
-                        return calEvent.invitees
-                            .map(function (invitee) { return invitee.name; })
-                            .join('<br>');
                     });
-                {% endif %}
-
-                var buttons = {
-// Reduced options to simplify interface
-/*
-                    '{{"ExportiCalConfidential"|get_lang}}' : function() {
-                        url =  "ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=confidential";
-                        window.location.href = url;
-                    },
-                    '{{"ExportiCalPrivate"|get_lang}}': function() {
-                        url =  "ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=private";
-                        window.location.href = url;
-                    },
-*/
-                    '{{"ExportiCalPublic"|get_lang}}': function() {
-                        url =  "ical_export.php?id=" + calEvent.id+'&course_id='+calEvent.course_id+"&class=public";
-                        window.location.href = url;
-                    }
-                };
-
-                {% if agenda_collective_invitations and 'personal' == type %}
-                    if (!calEvent.subscription_visibility) {
-                        buttons['{{ "Delete"|get_lang }}'] = function () {
-                            $.ajax({
-                                url: delete_url,
-                                success:function() {
-                                    calendar.fullCalendar('removeEvents',
-                                        calEvent
-                                    );
-                                    calendar.fullCalendar('refetchEvents');
-                                    calendar.fullCalendar('rerenderEvents');
-                                    $("#simple-dialog-form").dialog('close');
-                                }
-                            });
-                        };
-                    }
-                {% endif %}
-
-                {% if agenda_event_subscriptions and 'personal' == type %}
-                    $('#simple_subscriptions').html(showSubcriptionsContainer(calEvent));
-
-                    if (calEvent.subscription_visibility > 0) {
-                        if (calEvent.user_is_subscribed) {
-                            buttons["{{ 'Unsubscribe'|get_lang }}"] = function () {
-                                $.ajax({
-                                    url: '{{ web_agenda_ajax_url }}&a=event_unsubscribe&id=' + calEvent.id,
-                                    success:function() {
-                                        calendar.fullCalendar('refetchEvents');
-                                        //calendar.fullCalendar('rerenderEvents');
-                                        $("#simple-dialog-form").dialog('close');
-                                    }
-                                });
-                            };
-                        } else if (calEvent.can_subscribe) {
-                            buttons["{{ 'Subscribe'|get_lang }}"] = function () {
-                                $.ajax({
-                                    url: '{{ web_agenda_ajax_url }}&a=event_subscribe&id=' + calEvent.id,
-                                    success:function() {
-                                        calendar.fullCalendar('refetchEvents');
-                                        //calendar.fullCalendar('rerenderEvents');
-                                        $("#simple-dialog-form").dialog('close');
-                                    }
-                                });
-                            }
-                        }
-                    }
-                {% endif %}
-
-                if ('session_subscription' === calEvent.type) {
-                    buttons["{{ "GoToCourse"|get_lang }}"] = function() {
-                        window.location.href = calEvent.course_url;
-                    };
                 }
-
-                $("#simple-dialog-form").dialog("open");
-                $("#simple-dialog-form").dialog({
-					buttons: buttons
-				});
-            }
-		},
-		editable: true,
-		events: "{{web_agenda_ajax_url}}&a=get_events",
-		eventDrop: function(event, delta, revert_func) {
-		    var allDay = 0;
-		    if (event.allDay == true) {
-		        allDay = 1;
-            }
-			$.ajax({
-				url: '{{ web_agenda_ajax_url }}',
-				data: {
-                    a: 'move_event',
-                    id: event.id,
-                    all_day: allDay,
-                    minute_delta: delta.asMinutes()
-				}
-			});
-		},
-        eventResize: function(event, delta, revert_func) {
-            $.ajax({
-				url: '{{ web_agenda_ajax_url }}',
-				data: {
-                    a: 'resize_event',
-                    id: event.id,
-                    minute_delta: delta.asMinutes()
-				}
-			});
+            });
         },
-		axisFormat: 'H(:mm)', // pm-am format -> h(:mm)a
-		timeFormat: 'H:mm',   // pm-am format -> h:mm
-		loading: function(bool) {
-			if (bool) $('#loading').show();
-			else $('#loading').hide();
-		}
-	});
-
-    {{ agenda_reminders_js }}
-
-    function isInvitation (calEvent) {
-        if ((calEvent.invitees && calEvent.invitees.length)
-            || !calEvent.subscription_visibility
-        ) {
-            return true;
-        } else {
-            return false;
+        events: {
+            url: '{{ _p.web_ajax }}agenda.ajax.php?a=get_events&type={{ type }}{% if _cid %}&{{ cid_req }}{% endif %}',
+            type: 'GET',
+            error: function() {
+                console.error('Error fetching calendar events');
+            }
         }
-    }
+    });
 
-    function showSubcriptionsContainer (calEvent) {
-        if ((calEvent.invitees && calEvent.invitees.length)
-            || !calEvent.subscription_visibility
-        ) {
-            return '';
-        }
+    window.calendar = calendar;
 
-        $('#subscriptions-block').show();
-
-        var html = '';
-        html += '<dl class="dl-horizontal">';
-        html += "<dt>{{ 'AllowSubscriptions'|get_lang }}</dt>";
-        html += '<dd>';
-
-        if (1 === calEvent.subscription_visibility) {
-            html += "{{ 'AllUsersOfThePlatform'|get_lang }}";
-        }
-
-        if (2 === calEvent.subscription_visibility) {
-            html += "{{ 'UsersInsideClass'|get_lang }}<br>" + calEvent.usergroup;
-        }
-
-        html += '</dd>';
-
-        if (calEvent.max_subscriptions) {
-            html += "<dt>{{ 'MaxSubscriptions'|get_lang }}</dt>";
-            html += '<dd>' + calEvent.max_subscriptions + '</dd>';
-        }
-
-        html += "<dt>{{ 'Subscriptions'|get_lang }}</dt><dd>" + calEvent.count_subscribers + "</dd>";
-
-        if (calEvent.subscribers) {
-            html += '<dt>{{ 'Subscribers'|get_lang }}</dt><dd>';
-            html += calEvent.subscribers
-                .map(function (invitee) { return invitee.name; })
-                .join('<br>');
-            html += '</dd>'
-        }
-
-        html += '</dl>';
-
-        return html;
+    // Trigger open modal if action=add_modal
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'add_modal') {
+        window.openAddNewEventModal();
     }
 });
 </script>
-{{ actions_div }}
-{{ toolbar }}
 
-<div id="simple-dialog-form" style="display:none;">
-    <form name="form-simple" class="form-horizontal">
-        <span id="calendar_course_info_simple"></span>
-        <span id="calendar_session_info"></span>
-        <div class="form-group">
-            <label class="col-sm-3 control-label">
-                <b>{{ "Date" |get_lang}}</b>
-            </label>
-            <div class="col-sm-9">
-                <p class="form-control-static">
-                    <span id="simple_start_date"></span>
-                    <span id="simple_end_date"></span>
-                </p>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="col-sm-3 control-label">
-                <b>{{ "Title" |get_lang}}</b>
-            </label>
-            <div class="col-sm-9">
-                <p id="simple_title" class="form-control-static"></p>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="col-sm-3 control-label">
-                <b>{{ "Description" |get_lang}}</b>
-            </label>
-            <div class="col-sm-9">
-                <div id="simple_content" class="form-control-static"></div>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="col-sm-3 control-label">
-                <b>{{ "Comment" |get_lang}}</b>
-            </label>
-            <div class="col-sm-9">
-                <p id="simple_comment" class="form-control-static"></p>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="col-sm-3 control-label">
-                <b>{{ "Attachment" |get_lang}}</b>
-            </label>
-            <div class="col-sm-9">
-                <div id="simple_attachment"></div>
-            </div>
-        </div>
-
-        {% if agenda_collective_invitations and 'personal' == type %}
-            <div class="form-group">
-                <label class="col-sm-3 control-label">{{ 'Invitees' }}</label>
-                <div class="col-sm-9" id="simple_invitees"></div>
-            </div>
-        {% endif %}
-
-        {% if agenda_reminders %}
-            <div class="form-group">
-                <div class="col-sm-offset-3 col-sm-9" id="simple_notification_list"></div>
-            </div>
-        {% endif %}
-
-        {% if career_in_global_events %}
-            <div class="form-group" id="simple_career_field">
-                <label class="col-sm-3 control-label">
-                    <b>{{ "Career" |get_lang}}</b>
-                </label>
-                <div class="col-sm-9">
-                    <p class="form-control-static" id="simple_career"></p>
-                </div>
-            </div>
-
-            <div class="form-group" id="simple_promotion_field">
-                <label class="col-sm-3 control-label">
-                    <b>{{ "Promotion" |get_lang}}</b>
-                </label>
-                <div class="col-sm-9">
-                    <p class="form-control-static" id="simple_promotion"></p>
-                </div>
-            </div>
-        {% endif %}
-
-        {% if agenda_event_subscriptions and 'personal' == type %}
-            <div class="form-group" id="simple_subscriptions"></div>
-        {% endif %}
-    </form>
-</div>
-
-<div id="dialog-form" style="display:none;">
-	<div class="dialog-form-content">
+<!-- Add Event Modal Container -->
+<div id="dialog-form" style="display:none;" title="Add Calendar Event">
+    <div class="dialog-form-content">
         {{ form_add }}
-	</div>
+    </div>
 </div>
 
-{% if legend_list %}
-    {% for color, text in legend_list %}
-        <span style="background-color: {{ color }}" class="label label-default">&nbsp;</span> {{ text }} &nbsp;&nbsp;
-    {% endfor %}
-    <br /><br />
-{% endif %}
-<div id="loading" style="margin-left:150px;position:absolute;display:none">
-    {{ "Loading" | get_lang }}...
-</div>
-<div id="calendar"></div>
+<!-- Event Details Modal Container -->
+<div id="simple-dialog-form" style="display:none;" title="Event Details"></div>

@@ -590,54 +590,42 @@ $actions = '';
 $selectedTab = 1;
 
 if ($canRead) {
-    echo '<div class="actions">';
-    switch ($type) {
-        case STUDENT:
-            $selectedTab = 1;
-            $url = api_get_path(WEB_CODE_PATH).'user/subscribe_user.php?'.api_get_cidreq().'&type='.STUDENT;
-            $icon = Display::url(
-                Display::return_icon('add-user.png', get_lang('Add'), [], ICON_SIZE_MEDIUM),
-                $url
-            );
-            break;
-        case COURSEMANAGER:
-            $selectedTab = 2;
-            $url = api_get_path(WEB_CODE_PATH).'user/subscribe_user.php?'.api_get_cidreq().'&type='.COURSEMANAGER;
-            $icon = Display::url(
-                Display::return_icon('add-teacher.png', get_lang('Add'), [], ICON_SIZE_MEDIUM),
-                $url
-            );
-            break;
-    }
-
-    echo '<div class="row">';
-    echo '<div class="col-md-6">';
+    echo '<div class="et-student-toolbar" style="background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; padding:18px 20px; margin-bottom:24px; box-shadow:0 2px 8px rgba(0,0,0,0.03);">';
+    echo '<div class="row" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">';
+    echo '<div class="col-xs-12 col-md-7">';
+    echo '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
 
     if ($canEdit) {
-        echo $icon;
-    }
-
-    if ($canRead) {
-        $actions .= '<a href="user.php?'.api_get_cidreq().'&action=export&format=csv&type='.$type.'">'.
-            Display::return_icon('export_csv.png', get_lang('ExportAsCSV'), [], ICON_SIZE_MEDIUM).'</a> ';
-        $actions .= '<a href="user.php?'.api_get_cidreq().'&action=export&format=xls&type='.$type.'">'.
-            Display::return_icon('export_excel.png', get_lang('ExportAsXLS'), [], ICON_SIZE_MEDIUM).'</a> ';
+        $btnLabel = ($type == COURSEMANAGER) ? get_lang('AddTeacher') : get_lang('AddUsersToCourse');
+        echo '<a class="btn btn-et-primary" style="display:inline-flex; align-items:center; gap:8px; font-weight:600; padding:8px 16px; border-radius:8px;" href="subscribe_user.php?'.api_get_cidreq().'&type='.$type.'">';
+        echo '<em class="fa fa-user-plus"></em> '.$btnLabel;
+        echo '</a>';
     }
 
     if ($canEditUsers && $canEdit) {
-        $actions .= '<a href="user_import.php?'.api_get_cidreq().'&action=import&type='.$type.'">'.
-            Display::return_icon('import_csv.png', get_lang('ImportUsersToACourse'), [], ICON_SIZE_MEDIUM).'</a> ';
+        echo '<a class="btn btn-default" style="display:inline-flex; align-items:center; gap:8px; font-weight:600; padding:8px 16px; border-radius:8px; border:1px solid #CBD5E1; color:#0F172A;" href="user_import.php?'.api_get_cidreq().'&action=import&type='.$type.'">';
+        echo '<em class="fa fa-file-excel-o" style="color:#10B981;"></em> '.get_lang('ImportUsersToACourse').' (CSV)';
+        echo '</a>';
     }
 
     if ($canRead) {
-        $actions .= '<a href="user.php?'.api_get_cidreq().'&action=export&format=pdf&type='.$type.'">'.
-            Display::return_icon('pdf.png', get_lang('ExportToPDF'), [], ICON_SIZE_MEDIUM).'</a> ';
+        echo '<a class="btn btn-default" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; padding:8px 14px; border-radius:8px; border:1px solid #E2E8F0;" href="user.php?'.api_get_cidreq().'&action=export&format=csv&type='.$type.'" title="'.get_lang('ExportAsCSV').'">';
+        echo '<em class="fa fa-download text-muted"></em> CSV';
+        echo '</a>';
+        echo '<a class="btn btn-default" style="display:inline-flex; align-items:center; gap:6px; font-weight:600; padding:8px 14px; border-radius:8px; border:1px solid #E2E8F0;" href="user.php?'.api_get_cidreq().'&action=export&format=xls&type='.$type.'" title="'.get_lang('ExportAsXLS').'">';
+        echo '<em class="fa fa-file-excel-o text-success"></em> XLS';
+        echo '</a>';
     }
-    echo $actions;
+
+    $allowTutors = api_get_setting('allow_tutors_to_assign_students_to_session');
+    if (api_is_allowed_to_edit() && $allowTutors === 'true') {
+        echo '<a class="btn btn-default" style="font-weight:600; border-radius:8px;" href="session_list.php?'.api_get_cidreq().'">'.get_lang('Sessions').'</a>';
+    }
 
     echo '</div>';
-    echo '<div class="col-md-6">';
-    echo '<div class="pull-right">';
+    echo '</div>';
+    echo '<div class="col-xs-12 col-md-5">';
+    echo '<div class="pull-right" style="width:100%; max-width:320px;">';
     // Build search-form
     $form = new FormValidator(
         'search_user',
@@ -648,19 +636,13 @@ if ($canRead) {
         FormValidator::LAYOUT_INLINE
     );
     $form->addHidden('type', $type);
-    $form->addText('keyword', '', false);
+    $form->addText('keyword', '', false, ['placeholder' => 'Search by name or email...']);
     $form->addElement('hidden', 'cidReq', api_get_course_id());
     $form->addButtonSearch(get_lang('SearchButton'));
     $form->display();
     echo '</div>';
     echo '</div>';
     echo '</div>';
-
-    $allowTutors = api_get_setting('allow_tutors_to_assign_students_to_session');
-    if (api_is_allowed_to_edit() && $allowTutors === 'true') {
-        $actions .= ' <a class="btn btn-default" href="session_list.php?'.api_get_cidreq().'">'.
-            get_lang('Sessions').'</a>';
-    }
     echo '</div>';
 }
 

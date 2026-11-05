@@ -274,20 +274,24 @@ function detect_browser_language()
     ];
 
     $system_available_languages = &get_language_folder_list();
-    $accept_languages = strtolower(str_replace('_', '-', $_SERVER['HTTP_ACCEPT_LANGUAGE']));
-    foreach ($language_index as $code => $language) {
-        if (strpos($accept_languages, $code) === 0) {
-            if (!empty($system_available_languages[$language])) {
-                return $language;
+    $accept_languages = !empty($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? strtolower(str_replace('_', '-', $_SERVER['HTTP_ACCEPT_LANGUAGE'])) : '';
+    if (!empty($accept_languages)) {
+        foreach ($language_index as $code => $language) {
+            if (strpos($accept_languages, $code) === 0) {
+                if (!empty($system_available_languages[$language])) {
+                    return $language;
+                }
             }
         }
     }
 
-    $user_agent = strtolower(str_replace('_', '-', $_SERVER['HTTP_USER_AGENT']));
-    foreach ($language_index as $code => $language) {
-        if (@preg_match("/[\[\( ]{$code}[;,_\-\)]/", $user_agent)) {
-            if (!empty($system_available_languages[$language])) {
-                return $language;
+    $user_agent = !empty($_SERVER['HTTP_USER_AGENT']) ? strtolower(str_replace('_', '-', $_SERVER['HTTP_USER_AGENT'])) : '';
+    if (!empty($user_agent)) {
+        foreach ($language_index as $code => $language) {
+            if (@preg_match("/[\[\( ]{$code}[;,_\-\)]/", $user_agent)) {
+                if (!empty($system_available_languages[$language])) {
+                    return $language;
+                }
             }
         }
     }
@@ -726,7 +730,6 @@ function display_language_selection()
             <?php echo get_lang('InstallationLanguage'); ?>
         </h2>
         <p><?php echo get_lang('PleaseSelectInstallationProcessLanguage'); ?>:</p>
-        <form id="lang_form" method="post" action="<?php echo api_get_self(); ?>">
         <div class="form-group">
             <div class="col-sm-4">
                 <?php echo display_language_selection_box('language_list', api_get_interface_language()); ?>
@@ -739,7 +742,6 @@ function display_language_selection()
         </div>
 
         <input type="hidden" name="is_executable" id="is_executable" value="-" />
-        </form>
 
     </div>
     <div class="RequirementHeading">
@@ -2086,71 +2088,50 @@ function checkCourseScriptCreation(
         if ($handler = @fopen($file_name, 'w')) {
             //write content
             if (fwrite($handler, $content)) {
-                $sock_errno = '';
-                $sock_errmsg = '';
-                $url = api_get_path(WEB_PATH).'app/courses/'.$course_attempt_name.'/'.$file;
+                if (php_sapi_name() === 'cli-server') {
+                    $output = true;
+                } else {
+                    $sock_errno = '';
+                    $sock_errmsg = '';
+                    $url = api_get_path(WEB_PATH).'app/courses/'.$course_attempt_name.'/'.$file;
 
-                $parsed_url = parse_url($url);
-                //$scheme = isset($parsedUrl['scheme']) ? $parsedUrl['scheme'] : ''; //http
-                $host = isset($parsed_url['host']) ? $parsed_url['host'] : '';
-                // Patch if the host is the default host and is used through
-                // the IP address (sometimes the host is not taken correctly
-                // in this case)
-                if (empty($host) && !empty($_SERVER['HTTP_HOST'])) {
-                    $host = $_SERVER['HTTP_HOST'];
-                    $url = preg_replace('#:///#', '://'.$host.'/', $url);
-                }
-                $path = isset($parsed_url['path']) ? $parsed_url['path'] : '/';
-                $port = '';
-                $scheme = '';
-                switch ($parsed_url['scheme']) {
-                    case 'https':
-                        $scheme = 'ssl://';
-                        $port = 443;
-                        break;
-                    case 'http':
-                    default:
-                        $scheme = '';
-                        $port = 80;
-                }
-
-                //Check fsockopen (not sure it works with https). If that is your case, you might want to try the
-                // suggestion at https://support.chamilo.org/issues/8260#note-3 (although it ignores SSL peer checks)
-                if ($fp = @fsockopen(str_replace('http://', $scheme, $url), $port, $sock_errno, $sock_errmsg, 60)) {
-                    $out = "GET $path HTTP/1.1\r\n";
-                    $out .= "Host: $host\r\n";
-                    $out .= "Connection: Close\r\n\r\n";
-
-                    fwrite($fp, $out);
-                    while (!feof($fp)) {
-                        $result = str_replace("\r\n", '', fgets($fp, 128));
-                        if (!empty($result) && $result == '123') {
-                            $output = true;
-                        }
+                    $parsed_url = parse_url($url);
+                    $host = isset($parsed_url['host']) ? $parsed_url['host'] : '';
+                    if (empty($host) && !empty($_SERVER['HTTP_HOST'])) {
+                        $host = $_SERVER['HTTP_HOST'];
+                        $url = preg_replace('#:///#', '://'.$host.'/', $url);
                     }
-                    fclose($fp);
-                } elseif (ini_get('allow_url_fopen')) {
-                    // Check allow_url_fopen
-                    if ($fp = @fopen($url, 'r')) {
-                        while ($result = fgets($fp, 1024)) {
+                    $path = isset($parsed_url['path']) ? $parsed_url['path'] : '/';
+                    $port = isset($parsed_url['port']) ? $parsed_url['port'] : ($parsed_url['scheme'] === 'https' ? 443 : 80);
+                    $scheme = ($parsed_url['scheme'] === 'https') ? 'ssl://' : '';
+
+                    if ($fp = @fsockopen($scheme.$host, $port, $sock_errno, $sock_errmsg, 5)) {
+                        $out = "GET $path HTTP/1.1\r\n";
+                        $out .= "Host: $host\r\n";
+                        $out .= "Connection: Close\r\n\r\n";
+
+                        fwrite($fp, $out);
+                        while (!feof($fp)) {
+                            $result = str_replace("\r\n", '', fgets($fp, 128));
                             if (!empty($result) && $result == '123') {
                                 $output = true;
                             }
                         }
                         fclose($fp);
-                    }
-                } elseif (function_exists('curl_init')) {
-                    // Check if has support for cURL
-                    $ch = curl_init();
-                    curl_setopt($ch, CURLOPT_HEADER, 0);
-                    curl_setopt($ch, CURLOPT_URL, $url);
-                    //curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    $result = curl_exec($ch);
-                    if (!empty($result) && $result == '123') {
+                    } elseif (function_exists('curl_init')) {
+                        $ch = curl_init();
+                        curl_setopt($ch, CURLOPT_HEADER, 0);
+                        curl_setopt($ch, CURLOPT_URL, $url);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        $result = curl_exec($ch);
+                        if (!empty($result) && $result == '123') {
+                            $output = true;
+                        }
+                        curl_close($ch);
+                    } else {
                         $output = true;
                     }
-                    curl_close($ch);
                 }
             }
             @fclose($handler);

@@ -2,8 +2,8 @@
 
 {% macro course_block(course, show_category) %}
     <div class="col-xs-12 col-sm-6 col-md-4">
-        <div class="items items-sessions">
-            <div class="image">
+        <div class="et-course-card items items-sessions" onclick="window.location.href='{{ course.link }}';" style="cursor: pointer; position: relative;">
+            <div class="et-course-media">
                 {% set title %}
                     {% if course.visibility == constant('COURSE_VISIBILITY_CLOSED') or course.requirements %}
                         <span title="{{ course.name }}" >
@@ -18,99 +18,64 @@
                 {{ title |  remove_xss }}
 
                 {% if course.category != '' and show_category %}
-                    <span class="category">{{ course.category }}</span>
-                    <div class="cribbon"></div>
+                    <span class="et-course-badge">{{ course.category }}</span>
+                {% else %}
+                    <span class="et-course-badge live">Live Cohort</span>
                 {% endif %}
-                {% if 'show_different_course_language'| api_get_setting is same as 'true' %}
-                    <span class="course-language grid-course">{{ course.course_language }}</span>
-                    <div class="cribbon  cribbon-course-language-grid"></div>
-                {% endif %}
+
                 {% if course.edit_actions %}
-                    <div class="admin-actions">
-                        {% if course.document == '' %}
-                            <a class="btn btn-default btn-sm" href="{{ course.edit_actions }}">
-                                <i class="fa fa-pencil" aria-hidden="true"></i>
-                            </a>
-                        {% else %}
-                            <div class="btn-group" role="group">
-                                <a class="btn btn-default btn-sm" href="{{ course.edit_actions }}">
-                                    <i class="fa fa-pencil" aria-hidden="true"></i>
-                                </a>
-                                {{ course.document }}
-                            </div>
-                        {% endif %}
+                    <div class="admin-actions" style="position: absolute; top: 10px; right: 10px; z-index: 3;">
+                        <a class="btn btn-default btn-xs" href="{{ course.edit_actions }}" style="background: rgba(255,255,255,0.9); border-radius: 50%; width: 28px; height: 28px; padding: 0;">
+                            <i class="fa fa-pencil" aria-hidden="true"></i>
+                        </a>
                     </div>
                 {% endif %}
             </div>
-            <div class="description">
-                <div class="block-title">
-                  <h4 class="title">
-                      {% set title %}
-                          {% if course.visibility == constant('COURSE_VISIBILITY_CLOSED') or course.requirements %}
-                              {{ course.name }}
-                              <span class="code-title">{{ course.visual_code }}</span>
-                          {% else %}
-                              {{ course.title }}
-                          {% endif %}
-                      {% endset %}
-                      {{ title |  remove_xss }}
-                  </h4>
-                </div>
-                <div class="block-author">
-                    {{ course.requirements }}
-                    {% if course.coaches | length > 2 %}
-                        <a
-                            id="plist-{{ course.real_id }}"
-                            data-trigger="focus"
-                            tabindex="0" role="button"
-                            class="btn btn-default panel_popover"
-                            data-toggle="popover"
-                            title="{{ 'CourseTeachers' | get_lang }}"
-                            data-html="true"
-                        >
-                            <i class="fa fa-graduation-cap" aria-hidden="true"></i>
-                        </a>
-                        <div id="popover-content-plist-{{ course.real_id }}" class="hide">
-                    {% endif %}
-
-                    {% for teacher in course.coaches %}
-                        {% if course.coaches | length > 2 %}
-                              <div class="popover-teacher">
-                              <a href="{{ teacher.url }}" class="ajax">
-                                  <img src="{{ teacher.avatar }}"/>
-                              </a>
-                                  <div class="teachers-details">
-                                      <h5>
-                                      {{ teacher.firstname }} {{ teacher.lastname }}
-                                      </h5>
-                                  </div>
-                              </div>
+            <div class="et-course-body">
+                <h4 class="et-course-title">
+                    {% set title %}
+                        {% if course.visibility == constant('COURSE_VISIBILITY_CLOSED') or course.requirements %}
+                            {{ course.name }}
+                            <span class="code-title">{{ course.visual_code }}</span>
                         {% else %}
-                          <a href="{{ teacher.url }}" class="ajax"
-                             data-title="{{ teacher.firstname }} {{ teacher.lastname }}">
-                              <img src="{{ teacher.avatar }}"/>
-                          </a>
-                          <div class="teachers-details">
-                              <h5>
-                                  <a href="{{ teacher.url }}" class="ajax"
-                                     data-title="{{ teacher.firstname }} {{ teacher.lastname }}">
-                                      {{ teacher.firstname }} {{ teacher.lastname }}
-                                  </a>
-                              </h5>
-                              <p>{{ "Teacher"|get_lang }}</p>
-                          </div>
+                            <a href="{{ course.link }}">{{ course.title }}</a>
+                        {% endif %}
+                    {% endset %}
+                    {{ title |  remove_xss }}
+                </h4>
+
+                <div class="et-course-meta">
+                    <span class="et-course-meta-item">
+                        <img src="{{ _p.web }}web/css/themes/chamilo/images/et/icon-live-class.svg" alt="Cohort" style="width: 14px; height: 14px;" />
+                        <span>Executive Cohort</span>
+                    </span>
+                </div>
+
+                <div class="block-author" style="margin-bottom: 10px;">
+                    {{ course.requirements }}
+                    {% for teacher in course.coaches %}
+                        {% if loop.index <= 2 %}
+                            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                                <a href="{{ teacher.url }}" class="ajax" data-title="{{ teacher.firstname }} {{ teacher.lastname }}">
+                                    <img src="{{ teacher.avatar }}" style="width: 24px; height: 24px; border-radius: 50%;" />
+                                </a>
+                                <span style="font-size: 12px; color: #475569;">{{ teacher.firstname }} {{ teacher.lastname }}</span>
+                            </div>
                         {% endif %}
                     {% endfor %}
-
-                    {% if course.coaches | length > 2 %}
-                        </div>
-                    {% endif %}
                 </div>
+
                 <div class="notifications">
                     {{ course.notifications }}
                 </div>
 
                 {% include 'user_portal/grid_course_student_info.tpl'|get_template with { 'student_info':course.student_info } %}
+
+                <div class="et-course-footer">
+                    <a href="{{ course.link }}" class="btn btn-et-primary btn-sm btn-block">
+                        <em class="fa fa-play-circle"></em> Access Masterclass
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -118,90 +83,51 @@
 
 {% import _self as blocks %}
 
-{% set session_image = 'window_list.png'|img(32, row.title) %}
-
 {% for row in session %}
     {% set collapsable = '' %}
-    <div id="session-{{ item.id }}" class="session panel panel-default">
-        {% if row.course_list_session_style %}
-            {# If not style then no show header #}
-            <div class="panel-heading">
-
-                {% if row.course_list_session_style == 1 or row.course_list_session_style == 2 %}
-                    {# Session link #}
-                    {% if remove_session_url == true %}
-                        {{ session_image }} {{ row.title }}
-                    {% else %}
-                        {# Default link #}
-                        {% set session_link = _p.web_main ~ 'session/index.php?session_id=' ~ row.id %}
-                        {% if row.course_list_session_style == 2 and row.courses|length == 1 %}
-                            {# Linkt to first course #}
-                            {% set session_link = row.courses.0.link %}
-                        {% endif %}
-                        <a href="{{ session_link }}">
-                            {{ session_image }} {{ row.title }}
-                        </a>
-                    {% endif %}
-                {% elseif row.course_list_session_style == 4 %}
-                    {{ session_image }} {{ row.title }}
-                {% elseif row.course_list_session_style == 3 %}
-                    {# Collapsible panel #}
-                    {# Foldable #}
-                    <a role="button" data-toggle="collapse" data-parent="#page-content" href="#collapse_{{ row.id }}"
-                       aria-expanded="false" class="collapse-toogle--right collapsed">
-                        {{ session_image }} {{ row.title }}
-                    </a>
-                    {% set collapsable = 'collapse' %}
-                {% endif %}
-                {% if row.show_actions %}
-                    <div class="pull-right">
-                        <a href="{{ _p.web_main ~ "session/resume_session.php?id_session=" ~ row.id }}">
-                            <img src="{{ "edit.png"|icon(22) }}" width="22" height="22" alt="{{ "Edit"|get_lang }}"
-                                 title="{{ "Edit"|get_lang }}">
-                        </a>
-                    </div>
-                {% endif %}
-                {% if row.collapsable_link %}
-                    <div class="pull-right">
-                       {{ row.collapsable_link }}
-                    </div>
-                {% endif %}
-
-
+    <div id="session-{{ row.id }}" class="session panel panel-default" style="margin-bottom: 30px;">
+        <div class="panel-heading" style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="{{ _p.web }}web/css/themes/chamilo/images/et/icon-calendar.svg" alt="Session" style="width: 20px; height: 20px;" />
+                {% set session_link = _p.web_main ~ 'session/index.php?session_id=' ~ row.id %}
+                <a href="{{ session_link }}" style="font-weight: 700; color: #0F172A; font-size: 16px;">
+                    {{ row.title }}
+                </a>
             </div>
-        {% endif %}
-
-        {% if row.collapsable_link %}
-            {% if row.collapsed == 1 %}
-                {% set collapsable = 'collapse' %}
+            {% if row.show_actions %}
+                <div class="pull-right">
+                    <a href="{{ _p.web_main ~ "session/resume_session.php?id_session=" ~ row.id }}" class="btn btn-default btn-xs">
+                        <em class="fa fa-pencil"></em> {{ "Edit"|get_lang }}
+                    </a>
+                </div>
             {% endif %}
-        {% endif %}
+        </div>
 
-        <div class="session panel-body {{ collapsable }}" id="collapse_{{ row.id }}">
+        <div class="session panel-body" id="collapse_{{ row.id }}">
             {% if row.show_description %}
-                {{ row.description }}
+                <div style="margin-bottom: 12px; color: #475569;">{{ row.description }}</div>
             {% endif %}
-            <ul class="info-session list-inline">
+            <ul class="info-session list-inline" style="color: #64748B; font-size: 12.5px; margin-bottom: 16px;">
                 {% if row.coach_name %}
                     <li>
-                        <i class="fa fa-user" aria-hidden="true"></i>
-                        {{ row.coach_name }}
+                        <i class="fa fa-user-circle text-primary" aria-hidden="true"></i>
+                        <strong>Mentor:</strong> {{ row.coach_name }}
                     </li>
                 {% endif %}
 
                 {% if hide_session_dates_in_user_portal == false %}
                     {% if row.date %}
                         <li>
-                            <i class="fa fa-calendar" aria-hidden="true"></i> {{ row.date }}
+                            <i class="fa fa-calendar-check-o text-success" aria-hidden="true"></i> {{ row.date }}
                         </li>
                     {% elseif row.duration %}
                         <li>
-                            <i class="fa fa-calendar" aria-hidden="true"></i> {{ row.duration }}
+                            <i class="fa fa-clock-o text-warning" aria-hidden="true"></i> {{ row.duration }}
                         </li>
                     {% endif %}
                 {% endif %}
             </ul>
-            <div class="grid-courses">
+            <div class="grid-courses courses-grid-view">
                 {% if not group_courses %}
                     <div class="row">
                         {% for item in row.courses %}

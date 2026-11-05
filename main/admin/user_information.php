@@ -49,81 +49,27 @@ $table_course_user = Database::get_main_table(TABLE_MAIN_COURSE_USER);
 $table_course = Database::get_main_table(TABLE_MAIN_COURSE);
 $csvContent = [];
 
-// only allow platform admins to login_as, or session admins only for students (not teachers nor other admins)
-$actions = [
-    Display::url(
-        Display::return_icon(
-            'statistics.png',
-            get_lang('Reporting'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'mySpace/myStudents.php?'.http_build_query([
-            'student' => $userId,
-        ]),
-        ['title' => get_lang('Reporting')]
-    ),
-];
+// Clean modern admin actions for user information
+$actions = [];
+if (api_is_platform_admin()) {
+    $actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_edit.php?user_id='.$userId.'" class="btn btn-primary" style="background:#E3122B; border-color:#E3122B; font-weight:600;"><i class="fa fa-pencil"></i> '.get_lang('Edit').'</a>';
+}
+
+$actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'mySpace/myStudents.php?'.http_build_query(['student' => $userId]).'" class="btn btn-default" style="font-weight:600;"><i class="fa fa-bar-chart"></i> '.get_lang('Reporting').'</a>';
+
+require_once api_get_path(SYS_CODE_PATH).'inc/lib/magic_login.lib.php';
+$magicLink = MagicLoginManager::getMagicLoginUrl($userId);
+$actions[] = '<button type="button" class="btn btn-default" style="font-weight:600; color:#4F46E5; border-color:#C7D2FE; background:#EEF2FF;" onclick="quickCopyMagicLink(\''.htmlspecialchars($magicLink, ENT_QUOTES).'\', \''.htmlspecialchars(addslashes($user['complete_name'])).'\')"><i class="fa fa-magic"></i> Magic Login Link</button>';
 
 if (api_can_login_as($userId)) {
-    $actions[] = Display::url(
-        Display::return_icon(
-            'login_as.png',
-            get_lang('LoginAs'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'admin/user_list.php?action=login_as&user_id='.$userId.'&sec_token='.Security::getTokenFromSession()
-    );
+    $actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_list.php?action=login_as&user_id='.$userId.'&sec_token='.Security::getTokenFromSession().'" class="btn btn-default" style="font-weight:600;"><i class="fa fa-sign-in"></i> '.get_lang('LoginAs').'</a>';
 }
 
 if (api_is_platform_admin()) {
-    $actions[] = Display::url(
-        Display::return_icon(
-            'edit.png',
-            get_lang('Edit'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_CODE_PATH).'admin/user_edit.php?user_id='.$userId
-    );
-
-    $actions[] = Display::url(
-        Display::return_icon(
-            'export_csv.png',
-            get_lang('ExportAsCSV'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_self().'?user_id='.$userId.'&action=export'
-    );
-    $actions[] = Display::url(
-        Display::return_icon(
-            'vcard.png',
-            get_lang('UserInfo'),
-            [],
-            ICON_SIZE_MEDIUM
-        ),
-        api_get_path(WEB_PATH).'main/social/vcard_export.php?userId='.$userId
-    );
-    $actions[] = Display::url(
-        Display::return_icon('new_group.png', get_lang('AddHrmToUser'), [], ICON_SIZE_MEDIUM),
-        api_get_path(WEB_CODE_PATH).'admin/add_drh_to_user.php?u='.$userId
-    );
-
-    if (Skill::isAllowed($userId, false)) {
-        $actions[] = Display::url(
-            Display::return_icon(
-                'skill-badges.png',
-                get_lang('AddSkill'),
-                [],
-                ICON_SIZE_MEDIUM,
-                false
-            ),
-            api_get_path(WEB_CODE_PATH).'badge/assign.php?user='.$userId
-        );
-    }
+    $actions[] = '<a href="'.api_get_self().'?user_id='.$userId.'&action=export" class="btn btn-default" style="font-weight:600;"><i class="fa fa-download"></i> '.get_lang('ExportAsCSV').'</a>';
 }
+
+$actions[] = '<a href="'.api_get_path(WEB_CODE_PATH).'admin/user_dashboard.php?role=student" class="btn btn-default" style="font-weight:600;"><i class="fa fa-arrow-left"></i> '.get_lang('UserDashboard').'</a>';
 $userInfo = null;
 $studentBossList = UserManager::getStudentBossList($userId);
 $studentBossListToString = '';
@@ -155,6 +101,7 @@ $data = [
     get_lang('OfficialCode') => $user['official_code'],
     get_lang('Online') => !empty($user['user_is_online']) ? Display::return_icon('online.png') : Display::return_icon('offline.png'),
     get_lang('Status') => $user['status'] == 1 ? get_lang('Teacher') : get_lang('Student'),
+    get_lang('Password') => (!empty($user['plain_password']) ? '<code style="color: #DC2626; font-size: 13.5px; font-weight: 700; background: #FEF2F2; padding: 2px 8px; border-radius: 4px; border: 1px solid #FEE2E2;">' . htmlspecialchars($user['plain_password']) . '</code>' : '<span style="color:#9CA3AF; font-style:italic;">Encrypted</span>'),
 ];
 
 $userInfo = [
@@ -628,93 +575,74 @@ $fullUrl = UserManager::getUserPicture(
     USER_IMAGE_SIZE_ORIGINAL
 );
 
-if ($studentBossList) {
-    echo Display::page_subheader(get_lang('StudentBossList'));
-    echo $studentBossListToString;
+// Display user profile and activity overview
+$socialTool = false; // Disable social boxes
+$tpl->assign('social_tool', false);
+$coursesCount = 0;
+$resCount = Database::query("SELECT COUNT(cu.c_id) FROM $table_course_user cu, $table_course c WHERE cu.user_id = $userId AND cu.c_id = c.id AND cu.relation_type <> ".COURSE_RELATION_TYPE_RRHH);
+if ($resCount) {
+    $coursesCount = (int) Database::result($resCount, 0, 0);
 }
-
-$em = Database::getManager();
-$userRepository = UserManager::getRepository();
-
-$hrmList = $userRepository->getAssignedHrmUserList(
-    $userEntity->getId(),
-    api_get_current_access_url_id()
+$sessionsCount = !empty($sessions) ? count($sessions) : 0;
+$userCertificatesCount = (int) Database::result(
+    Database::query("SELECT COUNT(*) FROM gradebook_certificate WHERE user_id = $userId"),
+    0,
+    0
 );
 
-if ($hrmList) {
-    echo Display::page_subheader(get_lang('HrmList'));
-    echo '<div class="row">';
+$userInfo['username'] = $user['username'];
+$userInfo['firstname'] = $user['firstname'];
+$userInfo['lastname'] = $user['lastname'];
+$userInfo['status_id'] = (int) $user['status'];
+$userInfo['is_admin'] = !empty($user['is_admin']) ? 1 : 0;
+$userInfo['active'] = (int) $user['active'];
+$userInfo['courses_count'] = $coursesCount;
+$userInfo['sessions_count'] = $sessionsCount;
+$userInfo['certificates_count'] = $userCertificatesCount;
+$userInfo['magic_login_url'] = $magicLink;
 
-    /** @var UserRelUser $hrm */
-    foreach ($hrmList as $hrm) {
-        $hrmInfo = api_get_user_info($hrm->getFriendUserId());
-
-        $userPicture = isset($hrmInfo['avatar_medium']) ? $hrmInfo['avatar_medium'] : $hrmInfo['avatar'];
-        echo '<div class="col-sm-4 col-md-3">';
-        echo '<div class="media">';
-        echo '<div class="media-left">';
-        echo Display::img($userPicture, $hrmInfo['complete_name'], ['class' => 'media-object'], false);
-        echo '</div>';
-        echo '<div class="media-body">';
-        echo '<h4 class="media-heading">'.$hrmInfo['complete_name_with_message_link'].'</h4>';
-        echo $hrmInfo['username'];
-        echo '</div>';
-        echo '</div>';
-        echo '</div>';
-    }
-    echo '</div>';
-}
-
-if (DRH == $user['status']) {
-    $usersAssigned = UserManager::get_users_followed_by_drh($userId);
-
-    if ($usersAssigned) {
-        echo Display::page_subheader(get_lang('AssignedUsersListToHumanResourcesManager'));
-        echo '<div class="row">';
-        foreach ($usersAssigned as $userAssigned) {
-            $userAssigned = api_get_user_info($userAssigned['user_id']);
-            $userPicture = isset($userAssigned['avatar_medium']) ? $userAssigned['avatar_medium'] : $userAssigned['avatar'];
-
-            echo '<div class="col-sm-4 col-md-3">';
-            echo '<div class="media">';
-            echo '<div class="media-left">';
-            echo Display::img($userPicture, $userAssigned['complete_name'], ['class' => 'media-object'], false);
-            echo '</div>';
-            echo '<div class="media-body">';
-            echo '<h4 class="media-heading">'.$userAssigned['complete_name_with_message_link'].'</h4>';
-            echo $userAssigned['official_code'];
-            echo '</div>';
-            echo '</div>';
-            echo '</div>';
-        }
-        echo '</div>';
-    }
-}
-$socialTool = api_get_setting('allow_social_tool');
-$tpl->assign('social_tool', $socialTool);
 $tpl->assign('user', $userInfo);
 $layoutTemplate = $tpl->get_template('admin/user_information.tpl');
 $content = $tpl->fetch($layoutTemplate);
 echo $content;
-if (api_get_configuration_value('allow_career_users')) {
-    if (!empty($sessions)) {
-        $sessions = array_column($sessions, 'session_id');
-        echo SessionManager::getCareerDiagramPerSessionList($sessions, $userId);
-    }
-    echo MyStudents::userCareersTable($userId);
+
+// Clean panels for sessions and courses
+echo '<div class="panel panel-default" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 1px 4px rgba(0,0,0,0.05); background:#fff; overflow:hidden; margin-bottom:24px;">';
+echo '<div class="panel-heading" style="background:#FAFBFD; border-bottom:1px solid #E2E8F0; padding:14px 20px; font-weight:700; font-size:15px; color:#1E293B;">';
+echo '<i class="fa fa-calendar-check-o text-primary" style="margin-right:8px;"></i> '.get_lang('SessionList');
+echo '</div>';
+echo '<div class="panel-body" style="padding:16px 20px;">';
+echo $sessionInformation;
+echo '</div></div>';
+
+echo '<div class="panel panel-default" style="border-radius:12px; border:1px solid #E2E8F0; box-shadow:0 1px 4px rgba(0,0,0,0.05); background:#fff; overflow:hidden; margin-bottom:24px;">';
+echo '<div class="panel-heading" style="background:#FAFBFD; border-bottom:1px solid #E2E8F0; padding:14px 20px; font-weight:700; font-size:15px; color:#1E293B;">';
+echo '<i class="fa fa-graduation-cap text-primary" style="margin-right:8px;"></i> '.get_lang('CourseList');
+echo '</div>';
+echo '<div class="panel-body" style="padding:16px 20px;">';
+echo $courseInformation;
+echo '</div></div>';
+
+if (!empty($urlInformation)) {
+    echo $urlInformation;
 }
 
-echo Display::page_subheader(get_lang('SessionList'), null, 'h3', ['class' => 'section-title']);
-echo $sessionInformation;
 
-echo Display::page_subheader(get_lang('CourseList'), null, 'h3', ['class' => 'section-title']);
-echo $courseInformation;
-echo $urlInformation;
-
-echo Tracking::displayUserSkills(
-    $userId,
-    0,
-    0
-);
+echo <<<JS
+<script>
+function quickCopyMagicLink(url, name) {
+    if (!url) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(function() {
+            alert('Magic Login Link copied to clipboard!\n\n' + url);
+        }).catch(function() {
+            prompt('Copy Magic Login Link below:', url);
+        });
+    } else {
+        prompt('Copy Magic Login Link below:', url);
+    }
+}
+</script>
+JS;
 
 Display::display_footer();

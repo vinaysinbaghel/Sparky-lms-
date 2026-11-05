@@ -20,22 +20,27 @@ $courseCategoriesRepo = $em->getRepository('ChamiloCoreBundle:CourseCategory');
 // Get all possible teachers.
 $urlId = api_get_current_access_url_id();
 
-$courseId = isset($_GET['id']) ? $_GET['id'] : null;
+$courseId = isset($_GET['id']) ? $_GET['id'] : (isset($_GET['code']) ? $_GET['code'] : null);
 
 if (empty($courseId)) {
-    api_not_allowed(true);
+    // If no course ID provided, redirect to course list
+    header('Location: course_list.php');
+    exit;
 }
 
-$courseInfo = api_get_course_info_by_id($courseId);
-$courseCode = $courseInfo['code'];
-
-if (empty($courseInfo)) {
-    api_not_allowed(true);
+$courseInfo = api_get_course_info($courseId);
+if (empty($courseInfo) && is_numeric($courseId)) {
+    $courseInfo = api_get_course_info_by_id((int)$courseId);
 }
 
-$tool_name = get_lang('ModifyCourseInfo');
-$interbreadcrumb[] = ['url' => 'index.php', 'name' => get_lang('PlatformAdmin')];
-$interbreadcrumb[] = ['url' => 'course_list.php', 'name' => get_lang('CourseList')];
+if (!empty($courseInfo) && !empty($courseInfo['code'])) {
+    $cCode = urlencode($courseInfo['code']);
+    header("Location: course_curriculum.php?code=$cCode&tab=settings");
+    exit;
+}
+
+api_not_allowed(true);
+
 
 // Get all course categories
 $table_user = Database::get_main_table(TABLE_MAIN_USER);

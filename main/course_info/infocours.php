@@ -26,9 +26,19 @@ $_course = api_get_course_info();
 define('MODULE_HELP_NAME', 'Settings');
 
 $currentCourseRepository = $_course['path'];
-$is_allowedToEdit = api_is_course_admin() || api_is_platform_admin();
+$is_allowedToEdit = api_is_course_admin() || api_is_platform_admin() || api_is_platform_admin_by_id();
 $course_code = api_get_course_id();
 $courseId = api_get_course_int_id();
+
+if (!empty($_course) && !empty($_course['code'])) {
+    $cCode = urlencode($_course['code']);
+    header("Location: ".api_get_path(WEB_CODE_PATH)."admin/course_curriculum.php?code=$cCode&tab=settings");
+    exit;
+} elseif (!empty($course_code)) {
+    $cCode = urlencode($course_code);
+    header("Location: ".api_get_path(WEB_CODE_PATH)."admin/course_curriculum.php?code=$cCode&tab=settings");
+    exit;
+}
 
 function is_settings_editable()
 {

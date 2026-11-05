@@ -26,6 +26,12 @@ if (!api_is_allowed_to_create_course()) {
     exit;
 }
 
+if (api_is_platform_admin()) {
+    header("Location: ".api_get_path(WEB_CODE_PATH)."admin/course_add.php");
+    exit;
+}
+
+
 // Section for the tabs.
 $this_section = SECTION_COURSES;
 
@@ -142,8 +148,177 @@ if ($countCategories >= 100) {
     $form->addSelect(
         'category_code',
         get_lang('CourseFaculty'),
-        $categoriesOptions
+        $categoriesOptions,
+        ['id' => 'category_code']
     );
+}
+
+if (api_is_platform_admin()) {
+    $categoryManageHtml = '
+    <div class="form-group et-category-manage-bar" style="margin-top: -10px; margin-bottom: 18px;">
+        <div class="col-sm-offset-2 col-sm-10" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn btn-xs btn-default" id="btn-quick-add-category" style="font-weight: 600; border-radius: 6px; border-color: #CBD5E1; color: #0F172A; padding: 4px 10px;">
+                <em class="fa fa-plus-circle" style="color: #E3122B; margin-right: 4px;"></em> ' . get_lang('Add') . ' Category
+            </button>
+            <button type="button" class="btn btn-xs btn-default" id="btn-quick-delete-category" style="font-weight: 600; border-radius: 6px; border-color: #CBD5E1; color: #E3122B; padding: 4px 10px;">
+                <em class="fa fa-trash" style="margin-right: 4px;"></em> ' . get_lang('Delete') . ' Selected Category
+            </button>
+            <a href="' . api_get_path(WEB_CODE_PATH) . 'admin/course_category.php" target="_blank" class="btn btn-xs btn-link" style="color: #64748B; font-size: 12px; text-decoration: none;">
+                <em class="fa fa-cog"></em> Category Manager &raquo;
+            </a>
+        </div>
+    </div>
+    
+    <!-- Quick Add Category Modal -->
+    <div class="modal fade" id="modal-quick-add-category" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-sm" role="document">
+            <div class="modal-content" style="border-radius: 12px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+                <div class="modal-header" style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; padding: 14px 18px;">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title" style="font-weight: 700; font-size: 16px; color: #0F172A;">
+                        <em class="fa fa-folder-open-o" style="color: #E3122B; margin-right: 6px;"></em> Add Course Category
+                    </h4>
+                </div>
+                <div class="modal-body" style="padding: 18px;">
+                    <div id="quick-category-msg" style="display: none;" class="alert"></div>
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label for="quick_category_name" style="font-weight: 600; font-size: 13px; color: #334155;">Category Name *</label>
+                        <input type="text" class="form-control" id="quick_category_name" placeholder="e.g. Executive Finance" style="border-radius: 8px;" />
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="quick_category_code" style="font-weight: 600; font-size: 13px; color: #334155;">Category Code (Optional)</label>
+                        <input type="text" class="form-control" id="quick_category_code" placeholder="e.g. FIN101" style="border-radius: 8px;" />
+                    </div>
+                </div>
+                <div class="modal-footer" style="background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 12px 18px;">
+                    <button type="button" class="btn btn-default btn-sm" data-dismiss="modal" style="border-radius: 6px;">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-save-quick-category" style="background: #E3122B; border-color: #E3122B; font-weight: 600; border-radius: 6px;">
+                        <em class="fa fa-check"></em> Save Category
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    function reloadCategoryDropdown(selectedCode) {
+        $.ajax({
+            url: "' . api_get_path(WEB_AJAX_PATH) . 'course_category.ajax.php?a=get_categories",
+            type: "GET",
+            dataType: "json",
+            success: function(res) {
+                if (res && res.status === "success") {
+                    var select = $("#category_code, select[name=\'category_code\']");
+                    select.empty();
+                    select.append(new Option("' . addslashes(get_lang('None')) . '", ""));
+                    if (res.categories && res.categories.length > 0) {
+                        $.each(res.categories, function(i, cat) {
+                            var isSel = (selectedCode && cat.code === selectedCode);
+                            select.append(new Option(cat.name, cat.code, isSel, isSel));
+                        });
+                    }
+                    if (selectedCode) {
+                        select.val(selectedCode);
+                    } else {
+                        select.val("");
+                    }
+                    if (select.hasClass("selectpicker") || typeof $.fn.selectpicker !== "undefined") {
+                        try {
+                            select.selectpicker("refresh");
+                            if (selectedCode) {
+                                select.selectpicker("val", selectedCode);
+                            } else {
+                                select.selectpicker("val", "");
+                            }
+                        } catch(e) {}
+                    }
+                    select.trigger("change");
+                }
+            }
+        });
+    }
+
+    $(function() {
+        $("#btn-quick-add-category").on("click", function(e) {
+            e.preventDefault();
+            $("#quick_category_name").val("");
+            $("#quick_category_code").val("");
+            $("#quick-category-msg").hide();
+            $("#modal-quick-add-category").modal("show");
+            setTimeout(function() { $("#quick_category_name").focus(); }, 400);
+        });
+        
+        $("#btn-save-quick-category").on("click", function() {
+            var name = $.trim($("#quick_category_name").val());
+            var code = $.trim($("#quick_category_code").val());
+            if (!name) {
+                $("#quick-category-msg").removeClass("alert-success").addClass("alert alert-danger").text("Please enter a category name.").show();
+                return;
+            }
+            
+            var btn = $(this);
+            btn.prop("disabled", true).html("<em class=\'fa fa-spinner fa-spin\'></em> Saving...");
+            
+            $.ajax({
+                url: "' . api_get_path(WEB_AJAX_PATH) . 'course_category.ajax.php?a=add_category",
+                type: "POST",
+                data: { name: name, code: code },
+                dataType: "json",
+                success: function(resp) {
+                    btn.prop("disabled", false).html("<em class=\'fa fa-check\'></em> Save Category");
+                    if (resp && resp.status === "success") {
+                        $("#modal-quick-add-category").modal("hide");
+                        reloadCategoryDropdown(resp.code);
+                    } else {
+                        $("#quick-category-msg").removeClass("alert-success").addClass("alert alert-danger").text(resp.message || "Error saving category").show();
+                    }
+                },
+                error: function(xhr, status, err) {
+                    btn.prop("disabled", false).html("<em class=\'fa fa-check\'></em> Save Category");
+                    $("#quick-category-msg").removeClass("alert-success").addClass("alert alert-danger").text("Server communication error: " + (xhr.statusText || status)).show();
+                }
+            });
+        });
+        
+        $("#btn-quick-delete-category").on("click", function(e) {
+            e.preventDefault();
+            var select = $("#category_code, select[name=\'category_code\']");
+            var selectedCode = select.val();
+            var selectedText = select.find("option:selected").text();
+            
+            if (!selectedCode || selectedCode === "None" || selectedCode === "") {
+                alert("Please select a category from the dropdown first to remove it.");
+                return;
+            }
+            
+            if (confirm("Are you sure you want to delete the category: \'" + selectedText + "\'?")) {
+                var btn = $(this);
+                btn.prop("disabled", true).html("<em class=\'fa fa-spinner fa-spin\'></em> Deleting...");
+                
+                $.ajax({
+                    url: "' . api_get_path(WEB_AJAX_PATH) . 'course_category.ajax.php?a=delete_category",
+                    type: "POST",
+                    data: { code: selectedCode },
+                    dataType: "json",
+                    success: function(resp) {
+                        btn.prop("disabled", false).html("<em class=\'fa fa-trash\' style=\'margin-right: 4px;\'></em> ' . get_lang('Delete') . ' Selected Category");
+                        if (resp && resp.status === "success") {
+                            reloadCategoryDropdown("");
+                        } else {
+                            alert(resp.message || "Failed to delete category.");
+                        }
+                    },
+                    error: function(xhr, status, err) {
+                        btn.prop("disabled", false).html("<em class=\'fa fa-trash\' style=\'margin-right: 4px;\'></em> ' . get_lang('Delete') . ' Selected Category");
+                        alert("Error contacting server while deleting category.");
+                    }
+                });
+            }
+        });
+    });
+    </script>
+    ';
+    $form->addElement('html', $categoryManageHtml);
 }
 
 if (api_get_configuration_value('course_creation_form_set_course_category_mandatory')) {

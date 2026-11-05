@@ -86,7 +86,13 @@ if (array_key_exists('action', $_REQUEST)) {
 /* Constants and CONFIGURATION parameters */
 $load_dirs = api_get_setting('show_documents_preview');
 $displayMyCourseViewBySessionLink = api_get_setting('my_courses_view_by_session') === 'true';
-$nameTools = get_lang('MyCourses');
+$viewMode = Session::read('et_view_mode');
+$isUserView = (!api_is_platform_admin() || $viewMode === 'learner' || empty($viewMode));
+if (!$isUserView) {
+    header('Location: '.api_get_path(WEB_PATH).'index.php');
+    exit;
+}
+$nameTools = $isUserView ? 'Dashboard' : get_lang('MyCourses');
 $loadHistory = isset($_GET['history']) && intval($_GET['history']) == 1 ? true : false;
 
 // Load course notification by ajax
@@ -177,7 +183,7 @@ if ($displayMyCourseViewBySessionLink) {
 
 $myCourseListAsCategory = api_get_configuration_value('my_courses_list_as_category');
 
-$controller = new IndexManager(get_lang('MyCourses'));
+$controller = new IndexManager($nameTools);
 
 if (!$myCourseListAsCategory) {
     // Main courses and session list

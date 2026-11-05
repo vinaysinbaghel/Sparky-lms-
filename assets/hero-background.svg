@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#312E81"/></linearGradient></defs>
+<rect width="1200" height="420" rx="20" fill="url(#g)"/>
+<path d="M760 420 1200 0v220L980 420Z" fill="#1E1B4B" opacity=".75"/>
+<path d="M900 420 1200 120v110L1010 420Z" fill="#06B6D4" opacity=".25"/>
+<text x="55" y="165" font-family="'Plus Jakarta Sans',-apple-system,sans-serif" font-size="58" font-weight="800" fill="#fff">Learn. Build.</text>
+<text x="55" y="230" font-family="'Plus Jakarta Sans',-apple-system,sans-serif" font-size="58" font-weight="800" fill="#38BDF8">Innovate.</text>
+<text x="58" y="285" font-family="-apple-system,sans-serif" font-size="22" font-weight="500" fill="#E0E7FF">Sparky Free &amp; Open Learning Platform.</text>
+</svg>

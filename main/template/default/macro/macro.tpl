@@ -2,33 +2,33 @@
 
 {% macro collapse(name, title, content, list = false, expanded = 'true', title_right = '', title_icons = '') %}
     <div class="panel-group" id="{{ name }}" role="tablist" aria-multiselectable="true">
-        <div class="panel panel-default" id="{{ name }}_block">
+        <div class="panel panel-default et-sidebar-panel" id="{{ name }}_block">
             <div class="panel-heading" role="tab">
-
                 {% if title_icons %}
-                    {{ title_icons }}
+                    {{ title_icons|raw }}
                 {% endif %}
 
                 <a role="button" data-toggle="collapse" data-parent="#{{ name }}" href="#{{ name }}Collapse"
-                   aria-expanded="{{ expanded }}" aria-controls="{{ name }}Collapse">
-                    {{ title }}
+                   aria-expanded="{{ expanded }}" aria-controls="{{ name }}Collapse" class="et-panel-heading-btn">
+                    <span>{{ title }}</span>
+                    <em class="fa fa-chevron-down pull-right"></em>
                 </a>
 
                 {% if title_right %}
                     <div class="pull-right">
-                        {{ title_right }}
+                        {{ title_right|raw }}
                     </div>
                 {% endif %}
             </div>
             <div aria-expanded="{{ expanded }}" id="{{ name }}Collapse"
                  class="panel-collapse collapse {{  expanded == 'true' ? 'in' : '' }}" role="tabpanel">
-                <div class="panel-body">
+                <div class="panel-body" style="padding: 12px;">
                     {% if list %}
-                        <ul class="nav nav-pills nav-stacked">
-                            {{ content }}
-                        </ul>
+                        <div class="et-sidebar-btn-list">
+                            {{ content|raw }}
+                        </div>
                     {% else %}
-                        {{ content }}
+                        {{ content|raw }}
                     {% endif %}
                 </div>
             </div>
@@ -38,22 +38,24 @@
 
 {% macro collapseFor(name, title, array) %}
     <div class="panel-group" id="{{ name }}" role="tablist" aria-multiselectable="true">
-        <div class="panel panel-default" id="{{ name }}_block">
+        <div class="panel panel-default et-sidebar-panel" id="{{ name }}_block">
             <div class="panel-heading" role="tab">
                 <a role="button" data-toggle="collapse" data-parent="#{{ name }}" href="#{{ name }}Collapse"
-                   aria-expanded="true" aria-controls="{{ name }}Collapse">
-                    {{ title }}
+                   aria-expanded="true" aria-controls="{{ name }}Collapse" class="et-panel-heading-btn">
+                    <span>{{ title }}</span>
+                    <em class="fa fa-chevron-down pull-right"></em>
                 </a>
             </div>
             <div aria-expanded="true" id="{{ name }}Collapse" class="panel-collapse collapse in" role="tabpanel">
-                <div class="panel-body">
-                    <ul class="nav nav-pills nav-stacked">
+                <div class="panel-body" style="padding: 12px;">
+                    <div class="et-sidebar-btn-list">
                         {% for item in array %}
-                        <li>
-                            <a href="{{ item.link }}">{{ item.title }}</a>
-                        </li>
+                            <a href="{{ item.link }}" class="et-sidebar-action-btn">
+                                <span class="et-btn-title">{{ item.title|raw }}</span>
+                                <em class="fa fa-angle-right et-btn-chevron"></em>
+                            </a>
                         {% endfor %}
-                    </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -62,23 +64,24 @@
 
 {% macro collapseMenu(name, title, array) %}
     <div class="panel-group" id="{{ name }}" role="tablist" aria-multiselectable="true">
-        <div class="panel panel-default" id="{{ name }}_block">
+        <div class="panel panel-default et-sidebar-panel" id="{{ name }}_block">
             <div class="panel-heading" role="tab">
                 <a role="button" data-toggle="collapse" data-parent="#{{ name }}" href="#{{ name }}Collapse"
-                   aria-expanded="true" aria-controls="{{ name }}Collapse">
-                    {{ title }}
+                   aria-expanded="true" aria-controls="{{ name }}Collapse" class="et-panel-heading-btn">
+                    <span>{{ title }}</span>
+                    <em class="fa fa-chevron-down pull-right"></em>
                 </a>
             </div>
             <div aria-expanded="true" id="{{ name }}Collapse" class="panel-collapse collapse in" role="tabpanel">
-                <div class="panel-body">
-                    <ul class="list-group">
+                <div class="panel-body" style="padding: 12px;">
+                    <div class="et-sidebar-btn-list">
                         {% for item in array %}
-                            <li class="list-group-item {{ item.class }}">
-                                <span class="item-icon">{{ item.icon }}</span>
-                                <a href="{{ item.link }}">{{ item.title }}</a>
-                            </li>
+                            <a href="{{ item.link }}" class="et-sidebar-action-btn {{ item.class }}" title="{{ item.title|striptags }}">
+                                <span class="et-btn-title">{{ item.title|raw }}</span>
+                                <em class="fa fa-angle-right et-btn-chevron"></em>
+                            </a>
                         {% endfor %}
-                    </ul>
+                    </div>
                 </div>
             </div>
         </div>

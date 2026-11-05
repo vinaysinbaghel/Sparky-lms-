@@ -56,7 +56,7 @@
                                 <img class="img-circle" width="100" src="{{ user.user.avatar }}" class="center-block">
                             </div>
                             <p class="text-center"><em class="fa fa-user"></em>
-                                <a href="{{ _p.web_main }}social/profile.php?u={{ user['user'].user_id }}" target="_blank">
+                                <a href="{{ _p.web_main }}user/userInfo.php?uInfo={{ user['user'].user_id }}" target="_blank">
                                     {{ user['user'].complete_name_with_username }}
                                 </a>
                             </p>

@@ -101,6 +101,16 @@ if (!empty($_POST['submitAuth'])) {
 }
 
 if (!api_is_anonymous()) {
+    $viewMode = Session::read('et_view_mode');
+    if (empty($viewMode)) {
+        $viewMode = 'learner';
+    }
+    $isUserView = (!api_is_platform_admin() || $viewMode === 'learner');
+    if ($isUserView) {
+        header('Location: '.api_get_path(WEB_PATH).'user_portal.php');
+        exit;
+    }
+
     $url = api_get_configuration_value('redirect_index_to_url_for_logged_users');
     if (!empty($url)) {
         header("Location: $url");

@@ -111,13 +111,18 @@ switch ($action) {
         $content = $form->returnForm();
 
         if ($form->validate()) {
-            if (sha1($_POST['course_registration_code']) === $courseInfo['registration_code']) {
-                CourseManager::autoSubscribeToCourse($_POST['subscribe_user_with_password']);
+            $inputCode = trim($_POST['course_registration_code'] ?? '');
+            $storedCode = trim($courseInfo['registration_code'] ?? '');
+            $isMatch = (!empty($storedCode) && ($inputCode === $storedCode || sha1($inputCode) === $storedCode));
+
+            if ($isMatch) {
+                CourseManager::subscribeUser(api_get_user_id(), $_POST['subscribe_user_with_password'], STUDENT, 0, 0, false, false);
 
                 $redirectionTarget = CoursesAndSessionsCatalog::generateRedirectUrlAfterSubscription(
                     $courseInfo['course_public_url']
                 );
 
+                Display::addFlash(Display::return_message(get_lang('EnrollmentSuccessful') ?: 'Enrollment successful! You have been registered for this course.', 'success'));
                 header("Location: $redirectionTarget");
             } else {
                 Display::addFlash(Display::return_message(get_lang('CourseRegistrationCodeIncorrect'), 'warning'));

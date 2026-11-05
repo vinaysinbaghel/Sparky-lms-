@@ -9,8 +9,8 @@
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a class="navbar-brand" href="{{ _p.web }}">
-                <img src="{{ "icon-chamilo.png"|icon(22) }}" title="{{ "siteName" | api_get_setting }}">
+            <a class="navbar-brand" href="{{ _p.web }}" title="Sparky LMS">
+                <img src="{{ _p.web }}web/css/themes/chamilo/images/et/et-mark-placeholder.svg" style="height: 22px; width: auto; border-radius: 4px;" alt="Sparky">
             </a>
         </div>
 

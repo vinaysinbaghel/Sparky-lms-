@@ -121,13 +121,13 @@ class Agenda
         $this->events = [];
         $agendaColors = array_merge(
             [
-                'platform' => 'red', //red
-                'course' => '#458B00', //green
-                'group' => '#A0522D', //siena
-                'session' => '#00496D', // kind of green
-                'other_session' => '#999', // kind of green
-                'personal' => 'steel blue', //steel blue
-                'student_publication' => '#FF8C00', //DarkOrange
+                'platform' => '#EF4444', // Red for Platform Announcements
+                'course' => '#16A34A', // Green for Course Sessions
+                'group' => '#D97706', // Amber for Groups
+                'session' => '#00496D', // Dark Blue for Webhooks / Sessions
+                'other_session' => '#64748B', // Slate for other sessions
+                'personal' => '#4F46E5', // Indigo / Steel Blue for Personal Events
+                'student_publication' => '#EA580C', // Orange for Student Assignments
             ],
             api_get_configuration_value('agenda_colors') ?: []
         );
@@ -1343,7 +1343,7 @@ class Agenda
                 }
                 break;
             case 'course':
-                $courseId = api_get_course_int_id();
+                $courseId = !empty($this->course['real_id']) ? (int) $this->course['real_id'] : api_get_course_int_id();
                 $isAllowToEdit = $this->getIsAllowedToEdit();
 
                 if (!empty($courseId) && $isAllowToEdit) {
@@ -1608,10 +1608,14 @@ class Agenda
                         api_get_user_id(),
                         $ignoreVisibility
                     );
-                    $my_course_list = CourseManager::get_courses_list_by_user_id(
-                        api_get_user_id(),
-                        false
-                    );
+                    if (api_is_platform_admin()) {
+                        $my_course_list = CourseManager::get_courses_list();
+                    } else {
+                        $my_course_list = CourseManager::get_courses_list_by_user_id(
+                            api_get_user_id(),
+                            false
+                        );
+                    }
                 }
 
                 if (api_is_drh()) {
@@ -2037,7 +2041,8 @@ class Agenda
             $event['title'] = $row->getTitle();
             $event['className'] = 'personal';
             $event['borderColor'] = $event['backgroundColor'] = $this->event_personal_color;
-            $event['editable'] = $user_id === (int) $row->getUser();
+            $event['editable'] = (api_is_platform_admin() || $user_id === (int) $row->getUser());
+            $event['user_id'] = (int) $row->getUser();
             $event['sent_to'] = get_lang('Me');
             $event['type'] = 'personal';
 
@@ -2526,24 +2531,12 @@ class Agenda
                 }
 
                 $event['editable'] = false;
-                if ($this->getIsAllowedToEdit() && $this->type == 'course') {
+                if (api_is_platform_admin() || CourseManager::is_course_teacher(api_get_user_id(), $courseInfo['code'])) {
                     $event['editable'] = true;
-                    if (!empty($sessionId)) {
-                        if ($coachCanEdit == false) {
-                            $event['editable'] = false;
-                        }
-                        if ($isAllowToEditByHrm) {
-                            $event['editable'] = true;
-                        }
-                        if ($sessionId != $row['session_id']) {
-                            $event['editable'] = false;
-                        }
-                    }
-                    // if user is author then he can edit the item
-                    if (api_get_user_id() == $row['insert_user_id']) {
-                        $event['editable'] = true;
-                    }
+                } elseif ($this->type === 'course' && $this->getIsAllowedToEdit()) {
+                    $event['editable'] = true;
                 }
+                $event['insert_user_id'] = (int) ($row['insert_user_id'] ?? 0);
 
                 if (!empty($row['start_date'])) {
                     $event['start'] = $this->formatEventDate($row['start_date']);
@@ -2692,6 +2685,8 @@ class Agenda
             $event['parent_event_id'] = 0;
             $event['has_children'] = 0;
             $event['description'] = $row['content'];
+            $event['editable'] = (api_is_platform_admin() || api_get_user_id() == ($row['user_id'] ?? 0));
+            $event['editable'] = (api_is_platform_admin() || api_get_user_id() == ($row['user_id'] ?? 0));
 
             if ($allowCareersInGlobalAgenda) {
                 $event['career'] = null;
@@ -5382,5 +5377,186 @@ class Agenda
                 continue;
             }
         }
+    }
+
+    /**
+     * Return scheduled upcoming events for user's homepage display.
+     * Includes personal agenda events, course events, and platform events.
+     *
+     * @param int $userId
+     * @param int $limit
+     * @return array
+     */
+    public static function getUpcomingUserEvents($userId, $limit = 5)
+    {
+        $userId = (int) $userId;
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $now = api_get_utc_datetime();
+        $nowTs = time();
+        $t_personal = Database::get_main_table(TABLE_PERSONAL_AGENDA);
+
+        // 1. Fetch personal agenda events (future or ongoing within last 1 hour)
+        $sql = "SELECT id, user, title, text, date, enddate, course, all_day, color, 'personal' as event_type
+                FROM $t_personal
+                WHERE user = $userId
+                  AND (date >= DATE_SUB('$now', INTERVAL 1 HOUR) OR (enddate IS NOT NULL AND enddate >= '$now'))
+                ORDER BY date ASC
+                LIMIT 10";
+        $res = Database::query($sql);
+        $rawEvents = [];
+        while ($r = Database::fetch_assoc($res)) {
+            $rawEvents[] = $r;
+        }
+
+        // 2. Fetch course events for enrolled courses
+        $t_cu = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+        $t_c = Database::get_main_table(TABLE_MAIN_COURSE);
+        $sqlCourses = "SELECT c.id, c.code, c.title as course_title 
+                       FROM $t_cu cu 
+                       JOIN $t_c c ON cu.c_id = c.id 
+                       WHERE cu.user_id = $userId";
+        $resC = Database::query($sqlCourses);
+        $courseTitles = [];
+        $courseIds = [];
+        while ($cRow = Database::fetch_assoc($resC)) {
+            $courseIds[] = (int)$cRow['id'];
+            $courseTitles[$cRow['id']] = $cRow['course_title'];
+        }
+
+        if (!empty($courseIds)) {
+            $cIdList = implode(',', $courseIds);
+            $t_cal = Database::get_course_table(TABLE_AGENDA);
+            $sqlCourseEvents = "SELECT id, c_id, title, content as text, start_date as date, end_date as enddate, '' as course, all_day, color, 'course' as event_type
+                                FROM $t_cal 
+                                WHERE c_id IN ($cIdList) 
+                                  AND (start_date >= DATE_SUB('$now', INTERVAL 1 HOUR) OR (end_date IS NOT NULL AND end_date >= '$now'))
+                                ORDER BY start_date ASC 
+                                LIMIT 10";
+            $resCe = Database::query($sqlCourseEvents);
+            while ($rCe = Database::fetch_assoc($resCe)) {
+                $rCe['course_title'] = $courseTitles[$rCe['c_id']] ?? '';
+                $rawEvents[] = $rCe;
+            }
+        }
+
+        // 3. Platform calendar events
+        $t_sys = Database::get_main_table(TABLE_MAIN_SYSTEM_CALENDAR);
+        $sqlSys = "SELECT id, 0 as c_id, title, content as text, start_date as date, end_date as enddate, '' as course, all_day, '' as color, 'platform' as event_type
+                   FROM $t_sys 
+                   WHERE (start_date >= DATE_SUB('$now', INTERVAL 1 HOUR) OR (end_date IS NOT NULL AND end_date >= '$now'))
+                   ORDER BY start_date ASC 
+                   LIMIT 5";
+        $resSys = Database::query($sqlSys);
+        while ($rSys = Database::fetch_assoc($resSys)) {
+            $rSys['course_title'] = 'Platform Masterclass';
+            $rawEvents[] = $rSys;
+        }
+
+        // Sort all by date ASC
+        usort($rawEvents, function($a, $b) {
+            return strtotime($a['date']) - strtotime($b['date']);
+        });
+
+        // Deduplicate and process
+        $processed = [];
+        $seenTitles = [];
+
+        foreach ($rawEvents as $ev) {
+            $dedupKey = trim(strtolower($ev['title'])).'_'.substr($ev['date'], 0, 10);
+            if (isset($seenTitles[$dedupKey])) {
+                continue;
+            }
+            $seenTitles[$dedupKey] = true;
+
+            $startTs = strtotime($ev['date']);
+            $endTs = !empty($ev['enddate']) ? strtotime($ev['enddate']) : ($startTs + 3600);
+
+            // Date formatting
+            $formattedDate = date('l, M j, Y', $startTs);
+            $monthAbbr = strtoupper(date('M', $startTs));
+            $dayNum = date('j', $startTs);
+            $dayName = date('D', $startTs);
+
+            // Time formatting
+            if (!empty($ev['all_day'])) {
+                $formattedTime = 'All Day Session';
+            } else {
+                $formattedTime = date('h:i A', $startTs) . ' - ' . date('h:i A', $endTs);
+            }
+
+            // Relative time calculation
+            $diffSec = $startTs - $nowTs;
+            $isLiveNow = ($nowTs >= $startTs && $nowTs <= $endTs);
+            $isToday = (date('Y-m-d', $startTs) === date('Y-m-d', $nowTs));
+            $isTomorrow = (date('Y-m-d', $startTs) === date('Y-m-d', strtotime('+1 day', $nowTs)));
+
+            if ($isLiveNow) {
+                $badgeStatus = 'LIVE NOW';
+                $badgeColor = '#DC2626';
+                $relativeTime = 'Ongoing Session';
+            } elseif ($isToday) {
+                $badgeStatus = 'TODAY';
+                $badgeColor = '#EA580C';
+                $hoursLeft = round($diffSec / 3600, 1);
+                $relativeTime = ($diffSec > 0 && $hoursLeft <= 3) ? 'Starts in ' . round($diffSec / 60) . ' mins' : 'Today at ' . date('h:i A', $startTs);
+            } elseif ($isTomorrow) {
+                $badgeStatus = 'TOMORROW';
+                $badgeColor = '#D97706';
+                $relativeTime = 'Tomorrow at ' . date('h:i A', $startTs);
+            } else {
+                $daysLeft = ceil($diffSec / 86400);
+                $badgeStatus = 'UPCOMING';
+                $badgeColor = '#4F46E5';
+                $relativeTime = 'In ' . $daysLeft . ' days';
+            }
+
+            // Extract meet/video URL
+            $meetUrl = '';
+            if (preg_match('~(https?://[^\s<"]*(?:zoom\.us|meet\.google\.com|teams\.microsoft\.com|webex\.com)[^\s<"]*)~i', $ev['text'], $mUrl)) {
+                $meetUrl = $mUrl[1];
+            } elseif (preg_match('~(https?://[^\s<"]+)~i', $ev['text'], $mUrl)) {
+                $meetUrl = $mUrl[1];
+            }
+
+            $cleanDesc = strip_tags($ev['text']);
+            if (strlen($cleanDesc) > 160) {
+                $cleanDesc = substr($cleanDesc, 0, 157) . '...';
+            }
+
+            $processed[] = [
+                'id' => $ev['id'],
+                'event_type' => $ev['event_type'],
+                'title' => $ev['title'],
+                'description' => $cleanDesc,
+                'raw_text' => $ev['text'],
+                'date' => $ev['date'],
+                'enddate' => $ev['enddate'],
+                'start_ts' => $startTs,
+                'end_ts' => $endTs,
+                'formatted_date' => $formattedDate,
+                'formatted_time' => $formattedTime,
+                'month_abbr' => $monthAbbr,
+                'day_num' => $dayNum,
+                'day_name' => $dayName,
+                'relative_time' => $relativeTime,
+                'badge_status' => $badgeStatus,
+                'badge_color' => $badgeColor,
+                'is_live_now' => $isLiveNow,
+                'is_today' => $isToday,
+                'is_tomorrow' => $isTomorrow,
+                'course_title' => $ev['course_title'] ?? (!empty($ev['course']) ? $ev['course'] : ''),
+                'meet_url' => $meetUrl,
+                'calendar_url' => api_get_path(WEB_CODE_PATH) . 'calendar/agenda_js.php?type=' . $ev['event_type']
+            ];
+
+            if (count($processed) >= $limit) {
+                break;
+            }
+        }
+
+        return $processed;
     }
 }

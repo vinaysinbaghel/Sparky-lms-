@@ -122,7 +122,7 @@
                                 </li>
                                 <li class="autor">
                                     <i class="fa fa-user" aria-hidden="true"></i>
-                                    <a href="{{ _p.web }}main/social/profile.php?u={{ post.id_author }}">
+                                    <a href="{{ _p.web_main }}user/userInfo.php?uInfo={{ post.id_author }}">
                                         {{ post.author }}
                                     </a>
                                 </li>

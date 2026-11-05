@@ -72,7 +72,7 @@ if (!empty($group_id)) {
 $tpl = new Template(get_lang('Agenda'));
 $tpl->assign('use_google_calendar', 0);
 
-$can_add_events = 0;
+$can_add_events = !api_is_anonymous() ? 1 : 0;
 
 switch ($type) {
     case 'admin':
@@ -178,13 +178,13 @@ if ($type == 'course' && !empty($session_id)) {
 
 $agendaColors = array_merge(
     [
-        'platform' => 'red', //red
-        'course' => '#458B00', //green
-        'group' => '#A0522D', //siena
-        'session' => '#00496D', // kind of green
-        'other_session' => '#999', // kind of green
-        'personal' => 'steel blue', //steel blue
-        'student_publication' => '#FF8C00', //DarkOrange
+        'platform' => '#EF4444', // Red for Platform Announcements
+        'course' => '#16A34A', // Green for Course Sessions
+        'group' => '#D97706', // Amber for Groups
+        'session' => '#00496D', // Dark Blue for Webhooks / Sessions
+        'other_session' => '#64748B', // Slate for other sessions
+        'personal' => '#4F46E5', // Indigo / Steel Blue for Personal Events
+        'student_publication' => '#EA580C', // Orange for Student Assignments
     ],
     api_get_configuration_value('agenda_colors') ?: []
 );
@@ -230,7 +230,24 @@ if (isset($_GET['session_id'])) {
 
 $agenda_ajax_url .= '&sec_token='.Security::get_token();
 
-$tpl->assign('web_agenda_ajax_url', $agenda_ajax_url);
+$courseInfo = api_get_course_info();
+$tpl->assign('course_info', $courseInfo);
+
+$managedCourses = [];
+if (!api_is_anonymous()) {
+    if (api_is_platform_admin()) {
+        $managedCourses = CourseManager::get_courses_list();
+    } elseif (api_is_teacher()) {
+        $userCourses = CourseManager::get_courses_list_by_user_id(api_get_user_id(), false);
+        if (!empty($userCourses)) {
+            foreach ($userCourses as $uc) {
+                if (CourseManager::is_course_teacher(api_get_user_id(), $uc['code'])) {
+                    $managedCourses[] = $uc;
+                }
+            }
+        }
+    }
+}
 
 $form = new FormValidator(
     'form',
@@ -241,27 +258,73 @@ $form = new FormValidator(
 );
 $form->addHeader(get_lang('Events'));
 
-$form->addHtml('<span id="calendar_course_info"></span><div id="visible_to_input">');
+if ('course' === $type && !empty($courseInfo)) {
+    $form->addElement('label', get_lang('Course'), '<span class="label label-success" style="background:#16A34A; color:#FFFFFF; font-size:13px; font-weight:700; padding:5px 10px; border-radius:4px; display:inline-block;"><i class="fa fa-graduation-cap"></i> '.htmlspecialchars($courseInfo['title'].' ('.$courseInfo['code'].')').'</span>');
+    $form->addElement('hidden', 'event_scope', 'course_'.$courseInfo['real_id']);
+    $form->addHtml('<div id="visible_to_input">');
+    $sendTo = $agenda->parseAgendaFilter($userId);
+    $addOnlyItemsInSendTo = true;
+    if ($sendTo['everyone']) {
+        $addOnlyItemsInSendTo = false;
+    }
+    $agenda->showToForm($form, $sendTo, [], $addOnlyItemsInSendTo);
+    $form->addHtml('</div>');
+} else {
+    $scopeOptions = [
+        'personal' => '👤 Personal Event (Private to me)'
+    ];
+    if (!empty($managedCourses)) {
+        foreach ($managedCourses as $mc) {
+            $cTitle = !empty($mc['title']) ? $mc['title'] : $mc['code'];
+            $scopeOptions['course_'.$mc['real_id']] = '📚 Course: '.$cTitle.' ('.$mc['code'].')';
+        }
+    }
+    if (api_is_platform_admin()) {
+        $scopeOptions['platform'] = '📢 Platform Announcement (All Users)';
+    }
 
-$sendTo = $agenda->parseAgendaFilter($userId);
-$addOnlyItemsInSendTo = true;
-
-if ($sendTo['everyone']) {
-    $addOnlyItemsInSendTo = false;
+    // If user is a regular learner (not platform admin and does not manage any course), restrict to personal only
+    if (!api_is_platform_admin() && empty($managedCourses)) {
+        $form->addElement(
+            'label',
+            get_lang('EventTarget') ?: 'Event Type',
+            '<span class="label" style="background:#4F46E5; color:#FFFFFF; font-size:13px; font-weight:700; padding:5px 12px; border-radius:4px; display:inline-block;"><i class="fa fa-user"></i> Personal Event (Private to me)</span>'
+        );
+        $form->addElement('hidden', 'event_scope', 'personal');
+    } else {
+        $form->addElement(
+            'select',
+            'event_scope',
+            get_lang('EventTarget') ?: 'Event Target / Course',
+            $scopeOptions,
+            [
+                'id' => 'event_scope',
+                'class' => 'form-control',
+                'onchange' => 'window.onEventScopeChange && window.onEventScopeChange(this.value)',
+                'style' => 'font-weight:600;'
+            ]
+        );
+    }
+    $form->addHtml('<div id="visible_to_input" style="display: none;"></div>');
+    $form->addHtml('<div id="visible_to_input" style="display: none;"></div>');
 }
-
-$agenda->showToForm($form, $sendTo, [], $addOnlyItemsInSendTo);
-$form->addHtml('</div>');
 
 $form->addHtml('<div id="visible_to_read_only" style="display: none">');
 $form->addElement('label', get_lang('To'), '<p id="visible_to_read_only_users" class="form-control-static"></p>');
 $form->addHtml('</div>');
 
 $form->addElement('label', get_lang('Agenda'), '<p class="form-control-static"><span id ="color_calendar"></span></p>');
-$form->addElement(
-    'label',
-    get_lang('Date'), '<p class="form-control-static"><span id="start_date"></span><span id="end_date"></span></p>'
-);
+$form->addHtml('<div class="form-group" id="event_date_group">
+    <label class="col-sm-2 control-label"><b>'.get_lang('Date').' / '.get_lang('Time').'</b></label>
+    <div class="col-sm-4">
+        <label style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase; margin-bottom:2px;">'.get_lang('StartDate').'</label>
+        <input type="datetime-local" id="event_start_input" name="start" class="form-control" style="font-weight:600;" required>
+    </div>
+    <div class="col-sm-4">
+        <label style="font-size:11px; color:#64748B; font-weight:600; text-transform:uppercase; margin-bottom:2px;">'.get_lang('EndDate').'</label>
+        <input type="datetime-local" id="event_end_input" name="end" class="form-control" style="font-weight:600;" required>
+    </div>
+</div>');
 $form->addElement('text', 'title', get_lang('Title'), ['id' => 'title']);
 $form->addHtmlEditor(
     'content',
@@ -384,6 +447,12 @@ $form->addHeader(get_lang('FilesAttachment'));
 $form->addLabel(get_lang('Attachment'), '<div id="attachment_text" style="display: none"></div>');
 $form->addHtml('</div>');
 
+$form->addHtml('<div class="form-group et-modal-submit-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #E2E8F0; text-align: right;">
+    <button type="button" class="btn btn-default" onclick="$(\'#dialog-form\').dialog(\'close\');" style="margin-right: 8px; font-weight: 600; border-radius: 6px; padding: 8px 18px;">Cancel</button>
+    <button type="submit" id="add_event_submit_btn" class="btn btn-primary" style="background: #E3122B; border-color: #E3122B; color: #FFFFFF; font-weight: 700; border-radius: 6px; padding: 8px 24px; box-shadow: 0 2px 4px rgba(227,18,43,0.25);">
+        <i class="fa fa-check-circle"></i> Save Event
+    </button>
+</div>');
 $tpl->assign('form_add', $form->returnForm());
 $tpl->assign('legend_list', api_get_configuration_value('agenda_legend'));
 

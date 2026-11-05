@@ -32,6 +32,31 @@ use Fhaculty\Graph\Graph;
 $use_anonymous = true;
 require_once __DIR__.'/../inc/global.inc.php';
 
+// Route between Sparky Learner Course Player and Teacher Course Control Center
+$isCourseAdmin = api_is_course_admin() || api_is_platform_admin();
+$isStudentViewActive = (isset($_SESSION['studentview']) && $_SESSION['studentview'] === 'studentview') || (isset($_GET['isStudentView']) && $_GET['isStudentView'] === 'true');
+
+// If student view is requested explicitly via GET
+if (isset($_GET['isStudentView'])) {
+    if ($_GET['isStudentView'] === 'true') {
+        $_SESSION['studentview'] = 'studentview';
+        $isStudentViewActive = true;
+    } else {
+        $_SESSION['studentview'] = 'teacherview';
+        $isStudentViewActive = false;
+    }
+}
+
+// Students and anyone in Student View get the modern Learner Course Player
+if (!$isCourseAdmin || $isStudentViewActive) {
+    if (!isset($_GET['legacy'])) {
+        require __DIR__.'/course_player.php';
+        exit;
+    }
+}
+
+
+
 $js = '<script>'.api_get_language_translate_html().'</script>';
 $htmlHeadXtra[] = $js;
 $htmlHeadXtra[] = '<script>
@@ -270,6 +295,12 @@ if ($action === 'subscribe' && Security::check_token('get')) {
     exit;
 }
 
+// Load modern Sparky learner course player unless legacy view is requested
+if (!isset($_GET['legacy'])) {
+    require __DIR__.'/course_player.php';
+    exit;
+}
+
 /*	Is the user allowed here? */
 api_protect_course_script(true);
 
@@ -288,6 +319,8 @@ $logInfo = [
     'info' => '',
 ];
 Event::registerLog($logInfo);
+
+
 
 /* Auto launch code */
 $autoLaunchWarning = '';

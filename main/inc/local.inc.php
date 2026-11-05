@@ -469,9 +469,10 @@ if (!empty($_SESSION['_user']['user_id']) && !($login || $logout)) {
 
         // Lookup the user in the main database
         $user_table = Database::get_main_table(TABLE_MAIN_USER);
-        $sql = "SELECT user_id, username, password, auth_source, active, expiration_date, status, salt, last_login
+        $escapedLogin = Database::escape_string(trim($login));
+        $sql = "SELECT user_id, username, email, password, auth_source, active, expiration_date, status, salt, last_login
                 FROM $user_table
-                WHERE username = '".Database::escape_string($login)."'";
+                WHERE username = '$escapedLogin' OR email = '$escapedLogin'";
         $result = Database::query($sql);
 
         $captchaValidated = true;
@@ -479,7 +480,20 @@ if (!empty($_SESSION['_user']['user_id']) && !($login || $logout)) {
         $allowCaptcha = $captcha == 'true';
 
         if (Database::num_rows($result) > 0) {
-            $uData = Database::fetch_array($result, 'ASSOC');
+            $candidateUsers = [];
+            while ($candRow = Database::fetch_array($result, 'ASSOC')) {
+                $candidateUsers[] = $candRow;
+            }
+            $matchedUser = null;
+            foreach ($candidateUsers as $cand) {
+                if ($cand['auth_source'] == PLATFORM_AUTH_SOURCE || $cand['auth_source'] == CAS_AUTH_SOURCE) {
+                    if (isset($password) && UserManager::checkPassword($cand['password'], $password, (string)$cand['salt'], (int)$cand['user_id'])) {
+                        $matchedUser = $cand;
+                        break;
+                    }
+                }
+            }
+            $uData = ($matchedUser !== null) ? $matchedUser : $candidateUsers[0];
             if ($allowCaptcha) {
                 // Checking captcha
                 if (isset($_POST['captcha'])) {
@@ -576,7 +590,7 @@ if (!empty($_SESSION['_user']['user_id']) && !($login || $logout)) {
 
                 // Check the user's password
                 if (($validPassword || $checkUserFromExternalWebservice) &&
-                    (trim($login) == $uData['username'])
+                    (trim($login) == $uData['username'] || (!empty($uData['email']) && strcasecmp(trim($login), $uData['email']) === 0))
                 ) {
                     // Means that the login was loaded in a different page than index.php
                     // we force the reload of the course access using cidReset just in case

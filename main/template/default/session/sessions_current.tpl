@@ -40,14 +40,6 @@
                                     </span>
                                 </div>
                             </div>
-                        {% else %}
-                            <div class="toolbar">
-                                <div class="buycourses-price">
-                                    <span class="label label-primary label-free">
-                                        <strong>{{ 'Free'|get_plugin_lang('BuyCoursesPlugin') }}</strong>
-                                    </span>
-                                </div>
-                            </div>
                         {% endif %}
                     {% endif %}
                 </div>

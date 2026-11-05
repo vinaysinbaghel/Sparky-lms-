@@ -68,6 +68,22 @@ $blocks = CourseHome::getUserBlocks();
 $activityView = new Template('', false, false, false, false, false, false);
 $activityView->assign('blocks', $blocks);
 
+$courseInfo = api_get_course_info();
+$isCourseAdmin = (api_is_course_admin() && api_is_allowed_to_edit(null, true));
+$isStudentView = (isset($_SESSION['studentview']) && $_SESSION['studentview'] === 'studentview');
+$studentCount = 0;
+if (!empty($courseInfo['code'])) {
+    $studentCount = CourseManager::get_user_list_from_course_code($courseInfo['code'], 0, null, null, null, true);
+}
+
+$activityView->assign('is_course_admin', $isCourseAdmin);
+$activityView->assign('is_student_view', $isStudentView);
+$activityView->assign('course_info', $courseInfo);
+$activityView->assign('student_count', $studentCount);
+$activityView->assign('web_code_path', api_get_path(WEB_CODE_PATH));
+$activityView->assign('web_path', api_get_path(WEB_PATH));
+$activityView->assign('cid_req', api_get_cidreq());
+
 $content .= $activityView->fetch(
     $activityView->get_template('course_home/activity.tpl')
 );

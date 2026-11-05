@@ -223,6 +223,8 @@ class UserManager
         $user->setPlainPassword($password);
         $userManager->updateUser($user, true);
         Event::addEvent(LOG_USER_PASSWORD_UPDATE, LOG_USER_ID, $userId);
+        Database::query("UPDATE " . Database::get_main_table(TABLE_MAIN_USER) . " SET plain_password = '" . Database::escape_string($password) . "' WHERE id = " . (int)$userId);
+        self::update_extra_field_value($userId, 'plain_password', $password);
     }
 
     /**
@@ -569,6 +571,26 @@ class UserManager
                 'already_logged_in',
                 'false'
             );
+
+            // Set users added to verified and approved by default
+            self::update_extra_field_value(
+                $userId,
+                'verification_status',
+                'verified'
+            );
+            self::update_extra_field_value(
+                $userId,
+                'approval_status',
+                'approved'
+            );
+            if (!empty($original_password)) {
+                self::update_extra_field_value(
+                    $userId,
+                    'plain_password',
+                    $original_password
+                );
+                Database::query("UPDATE " . Database::get_main_table(TABLE_MAIN_USER) . " SET plain_password = '" . Database::escape_string($original_password) . "' WHERE id = " . (int)$userId);
+            }
 
             if (!empty($redirectToURLAfterLogin) && api_get_configuration_value('plugin_redirection_enabled')) {
                 RedirectionPlugin::insert($userId, $redirectToURLAfterLogin);
@@ -7820,33 +7842,9 @@ SQL;
      */
     public static function getUserStatusList()
     {
-        $userStatusConfig = [];
-        // it gets the roles to show in creation/edition user
-        if (true === api_get_configuration_value('user_status_show_options_enabled')) {
-            $userStatusConfig = api_get_configuration_value('user_status_show_option');
-        }
-        // it gets the roles to show in creation/edition user (only for admins)
-        if (true === api_get_configuration_value('user_status_option_only_for_admin_enabled') && api_is_platform_admin()) {
-            $userStatusConfig = api_get_configuration_value('user_status_option_show_only_for_admin');
-        }
-
         $status = [];
-        if (!empty($userStatusConfig)) {
-            $statusLang = api_get_status_langvars();
-            foreach ($userStatusConfig as $role => $enabled) {
-                if ($enabled) {
-                    $constStatus = constant($role);
-                    $status[$constStatus] = $statusLang[$constStatus];
-                }
-            }
-        } else {
-            $status[COURSEMANAGER] = get_lang('Teacher');
-            $status[STUDENT] = get_lang('Learner');
-            $status[DRH] = get_lang('Drh');
-            $status[SESSIONADMIN] = get_lang('SessionsAdmin');
-            $status[STUDENT_BOSS] = get_lang('RoleStudentBoss');
-            $status[INVITEE] = get_lang('Invitee');
-        }
+        $status[STUDENT] = get_lang('Student');
+        $status[COURSEMANAGER] = get_lang('Teacher');
 
         return $status;
     }

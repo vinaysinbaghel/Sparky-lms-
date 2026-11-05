@@ -18,6 +18,7 @@ app/logs/*
 /app/config/configuration.php
 
 # Courses
+courses
 app/courses/*
 !app/courses/proxy.php
 
@@ -53,3 +54,6 @@ plugin/vchamilo/templates/*
 web/
 node_modules
 yarn.lock
+
+# Temporary/scratch files
+scratch/

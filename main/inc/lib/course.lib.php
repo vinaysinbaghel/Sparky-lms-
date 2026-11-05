@@ -3954,6 +3954,17 @@ class CourseManager
                 $params['title'] = $course_info['title'];
                 $params['title_cut'] = $course_info['title'];
                 $params['link'] = $course_info['course_public_url'].'?id_session=0&autoreg=1';
+                
+                $courseUserTable = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+                $studentCount = (int)Database::result(
+                    Database::query("SELECT COUNT(DISTINCT user_id) FROM $courseUserTable WHERE c_id = $courseId AND status = ".STUDENT),
+                    0,
+                    0
+                );
+                $params['student_count'] = $studentCount;
+                $params['user_count'] = $studentCount;
+                $params['student_info'] = ['student_count' => $studentCount];
+
                 if (api_get_setting('display_teacher_in_courselist') === 'true') {
                     $params['teachers'] = self::getTeachersFromCourse(
                         $courseId,
@@ -4297,6 +4308,21 @@ class CourseManager
             if ($course_info['visibility'] != COURSE_VISIBILITY_CLOSED) {
                 $params['notifications'] = $showNotification;
             }
+
+            $courseUserTable = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+            $cRealId = (int)$course_info['real_id'];
+            $studentCount = (int)Database::result(
+                Database::query("SELECT COUNT(DISTINCT user_id) FROM $courseUserTable WHERE c_id = $cRealId AND status = ".STUDENT),
+                0,
+                0
+            );
+            $params['student_count'] = $studentCount;
+            $params['user_count'] = $studentCount;
+            if (!isset($params['student_info'])) {
+                $params['student_info'] = [];
+            }
+            $params['student_info']['student_count'] = $studentCount;
+
             $courseAdded[] = $course_info['real_id'];
             $courseList[] = $params;
         }
@@ -4455,6 +4481,20 @@ class CourseManager
         );
         $params['real_id'] = $course_info['real_id'];
         $params['visibility'] = $course_info['visibility'];
+
+        $courseUserTable = Database::get_main_table(TABLE_MAIN_COURSE_USER);
+        $cRealId = (int)$course_info['real_id'];
+        $studentCount = (int)Database::result(
+            Database::query("SELECT COUNT(DISTINCT user_id) FROM $courseUserTable WHERE c_id = $cRealId AND status = ".STUDENT),
+            0,
+            0
+        );
+        $params['student_count'] = $studentCount;
+        $params['user_count'] = $studentCount;
+        if (!isset($params['student_info'])) {
+            $params['student_info'] = [];
+        }
+        $params['student_info']['student_count'] = $studentCount;
 
         // Display the "what's new" icons
         $notifications = '';

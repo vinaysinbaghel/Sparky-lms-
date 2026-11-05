@@ -1819,7 +1819,7 @@ function _api_format_user($user, $add_password = false, $loadAvatars = true)
         $result['profile_completed'] = $user['profile_completed'];
     }
 
-    $result['profile_url'] = api_get_path(WEB_CODE_PATH).'social/profile.php?u='.$user_id;
+    $result['profile_url'] = api_get_path(WEB_CODE_PATH).'auth/profile.php';
 
     // Send message link
     $userIdHash = UserManager::generateUserHash($user_id);
@@ -3087,6 +3087,9 @@ function api_get_session_condition(
  */
 function api_get_setting($variable, $key = null)
 {
+    if ($variable === 'allow_social_tool' || ($variable === 'show_tabs' && $key === 'social') || $variable === 'allow_students_to_create_groups_in_social') {
+        return 'false';
+    }
     global $_setting;
     if ($variable == 'header_extra_content') {
         $filename = api_get_home_path().'header_extra_content.txt';
@@ -4020,6 +4023,14 @@ function api_not_allowed(
     $message = null,
     $responseCode = 0
 ) {
+    
+    if (api_is_xml_http_request() || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || (isset($_SERVER['PHP_SELF']) && strpos($_SERVER['PHP_SELF'], '/ajax/') !== false) || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/ajax/') !== false)) {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => $message ?? 'Access not allowed or session expired.']);
+        exit;
+    }
+
     if (api_get_setting('sso_authentication') === 'true') {
         global $osso;
         if ($osso) {
@@ -6127,7 +6138,7 @@ function api_get_software_name()
     if (!empty($name)) {
         return $name;
     } else {
-        return 'Chamilo';
+        return 'Sparky';
     }
 }
 
@@ -6171,12 +6182,13 @@ function api_get_status_langvars()
 {
     return [
         COURSEMANAGER => get_lang('Teacher', ''),
-        SESSIONADMIN => get_lang('SessionsAdmin', ''),
-        DRH => get_lang('Drh', ''),
         STUDENT => get_lang('Student', ''),
+        PLATFORM_ADMIN => get_lang('Administrator', ''),
         ANONYMOUS => get_lang('Anonymous', ''),
-        STUDENT_BOSS => get_lang('RoleStudentBoss', ''),
-        INVITEE => get_lang('Invited'),
+        SESSIONADMIN => get_lang('Teacher', ''),
+        DRH => get_lang('Administrator', ''),
+        STUDENT_BOSS => get_lang('Student', ''),
+        INVITEE => get_lang('Student', ''),
     ];
 }
 

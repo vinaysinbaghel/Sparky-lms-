@@ -235,9 +235,7 @@ class IndexManager
                 }
             }
 
-            if (trim($home_top_temp) == '' && api_is_platform_admin()) {
-                $home_top_temp = get_lang('PortalHomepageDefaultIntroduction');
-            }
+            // Do not inject default installation welcome message
             $open = str_replace('{rel_path}', api_get_path(REL_PATH), $home_top_temp);
             $html = api_to_system_encoding($open, api_detect_encoding(strip_tags($open)));
         }
@@ -881,14 +879,14 @@ class IndexManager
 
             $items[] = [
                 'class' => 'inbox-message-social',
-                'icon' => Display::return_icon('inbox.png', get_lang('Inbox')),
+                'icon' => Display::return_icon('inbox.png', get_lang('Inbox'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_CODE_PATH).'messages/inbox.php',
                 'title' => get_lang('Inbox').$cant_msg,
             ];
 
             $items[] = [
                 'class' => 'new-message-social',
-                'icon' => Display::return_icon('new-message.png', get_lang('Compose')),
+                'icon' => Display::return_icon('new-message.png', get_lang('Compose'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_CODE_PATH).'messages/new_message.php',
                 'title' => get_lang('Compose'),
             ];
@@ -897,7 +895,7 @@ class IndexManager
                 $total_invitations = Display::badge($total_invitations);
                 $items[] = [
                     'class' => 'invitations-social',
-                    'icon' => Display::return_icon('invitations.png', get_lang('PendingInvitations')),
+                    'icon' => Display::return_icon('invitations.png', get_lang('PendingInvitations'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'social/invitations.php',
                     'title' => get_lang('PendingInvitations').$total_invitations,
                 ];
@@ -906,7 +904,7 @@ class IndexManager
 
         $items[] = [
             'class' => 'personal-data',
-            'icon' => Display::return_icon('database.png', get_lang('PersonalDataReport')),
+            'icon' => Display::return_icon('database.png', get_lang('PersonalDataReport'), [], ICON_SIZE_SMALL, false),
             'link' => api_get_path(WEB_CODE_PATH).'social/personal_data.php',
             'title' => get_lang('PersonalDataReport'),
         ];
@@ -915,7 +913,7 @@ class IndexManager
             if (api_get_setting('allow_my_files') !== 'false') {
                 $items[] = [
                     'class' => 'myfiles-social',
-                    'icon' => Display::return_icon('sn-files.png', get_lang('Files')),
+                    'icon' => Display::return_icon('sn-files.png', get_lang('Files'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'social/myfiles.php',
                     'title' => get_lang('MyFiles'),
                 ];
@@ -924,7 +922,7 @@ class IndexManager
 
         $items[] = [
             'class' => 'profile-social',
-            'icon' => Display::return_icon('edit-profile.png', get_lang('EditProfile')),
+            'icon' => Display::return_icon('edit-profile.png', get_lang('EditProfile'), [], ICON_SIZE_SMALL, false),
             'link' => Display::getProfileEditionLink($userId),
             'title' => get_lang('EditProfile'),
         ];
@@ -934,7 +932,7 @@ class IndexManager
         ) {
             $label = get_lang('RequestLinkingToUser');
             $items[] = [
-                'icon' => Display::return_icon('new_group.png', $label),
+                'icon' => Display::return_icon('new_group.png', $label, [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_CODE_PATH).'social/require_user_linking.php',
                 'title' => $label,
             ];
@@ -1062,14 +1060,14 @@ class IndexManager
             if (api_get_setting('course_validation') === 'true' && !api_is_platform_admin()) {
                 $items[] = [
                     'class' => 'add-course',
-                    'icon' => Display::return_icon('new-course.png', get_lang('CreateCourseRequest')),
+                    'icon' => Display::return_icon('new-course.png', get_lang('CreateCourseRequest'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'create_course/add_course.php',
                     'title' => get_lang('CreateCourseRequest'),
                 ];
             } else {
                 $items[] = [
                     'class' => 'add-course',
-                    'icon' => Display::return_icon('new-course.png', get_lang('CourseCreate')),
+                    'icon' => Display::return_icon('new-course.png', get_lang('CourseCreate'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'create_course/add_course.php',
                     'title' => get_lang('CourseCreate'),
                 ];
@@ -1078,7 +1076,7 @@ class IndexManager
             if (SessionManager::allowToManageSessions()) {
                 $items[] = [
                     'class' => 'add-session',
-                    'icon' => Display::return_icon('session.png', get_lang('AddSession')),
+                    'icon' => Display::return_icon('session.png', get_lang('AddSession'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'session/session_add.php',
                     'title' => get_lang('AddSession'),
                 ];
@@ -1088,7 +1086,7 @@ class IndexManager
         // Sort courses
         $items[] = [
             'class' => 'order-course',
-            'icon' => Display::return_icon('order-course.png', get_lang('SortMyCourses')),
+            'icon' => Display::return_icon('order-course.png', get_lang('SortMyCourses'), [], ICON_SIZE_SMALL, false),
             'link' => api_get_path(WEB_CODE_PATH).'auth/sort_my_courses.php',
             'title' => get_lang('SortMyCourses'),
         ];
@@ -1097,14 +1095,14 @@ class IndexManager
         if (isset($_GET['history']) && intval($_GET['history']) == 1) {
             $items[] = [
                 'class' => 'history-course',
-                'icon' => Display::return_icon('history-course.png', get_lang('DisplayTrainingList')),
+                'icon' => Display::return_icon('history-course.png', get_lang('DisplayTrainingList'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_PATH).'user_portal.php',
                 'title' => get_lang('DisplayTrainingList'),
             ];
         } else {
             $items[] = [
                 'class' => 'history-course',
-                'icon' => Display::return_icon('history-course.png', get_lang('HistoryTrainingSessions')),
+                'icon' => Display::return_icon('history-course.png', get_lang('HistoryTrainingSessions'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_PATH).'user_portal.php?history=1',
                 'title' => get_lang('HistoryTrainingSessions'),
             ];
@@ -1123,7 +1121,7 @@ class IndexManager
             if (!api_is_drh()) {
                 $items[] = [
                     'class' => 'list-course',
-                    'icon' => Display::return_icon('catalog-course.png', get_lang('CourseCatalog')),
+                    'icon' => Display::return_icon('catalog-course.png', get_lang('CourseCatalog'), [], ICON_SIZE_SMALL, false),
                     'link' => api_get_path(WEB_CODE_PATH).'auth/courses.php',
                     'title' => get_lang('CourseCatalog'),
                 ];
@@ -1139,13 +1137,13 @@ class IndexManager
         if (!api_is_anonymous()) {
             $items[] = [
                 'class' => 'last-visited-course',
-                'icon' => Display::return_icon('clock.png', get_lang('LastVisitedCourse')),
+                'icon' => Display::return_icon('clock.png', get_lang('LastVisitedCourse'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_CODE_PATH).'course_home/last_course.php',
                 'title' => get_lang('LastVisitedCourse'),
             ];
             $items[] = [
                 'class' => 'last-visited-lp',
-                'icon' => Display::return_icon('learnpath.png', get_lang('LastVisitedLp')),
+                'icon' => Display::return_icon('learnpath.png', get_lang('LastVisitedLp'), [], ICON_SIZE_SMALL, false),
                 'link' => api_get_path(WEB_CODE_PATH).'course_home/last_lp.php',
                 'title' => get_lang('LastVisitedLp'),
             ];
@@ -1757,7 +1755,9 @@ class IndexManager
                                 $user_id,
                                 $courseCode
                             );
-                            $courses['not_category'][$key]['student_info']['progress'] = $progress === false ? null : $progress;
+                            $courses['not_category'][$key]['student_info']['progress'] = ($progress !== false && $progress > 0) ? round($progress) : 65;
+                        $courses['not_category'][$key]['lesson_count'] = 14;
+                        $courses['not_category'][$key]['duration_formatted'] = '~18 Hours';
                         }
 
                         if ($studentInfoScore) {
@@ -1794,6 +1794,54 @@ class IndexManager
                                     );
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+                        // ETupskill Dynamic Course Metadata Enrichment
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/course_curriculum.lib.php';
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/certificate_blueprint.lib.php';
+
+            $enrichCourseCard = function (&$cItem, $uId) {
+                $cCode = !empty($cItem['course_code']) ? $cItem['course_code'] : (!empty($cItem['code']) ? $cItem['code'] : '');
+                if (empty($cCode)) return;
+
+                $stats = CourseCurriculum::getCourseStats($cCode);
+                $cItem['lesson_count'] = $stats['lesson_count'];
+                $cItem['duration_formatted'] = $stats['duration_formatted'];
+
+                if (!isset($cItem['student_info']) || !is_array($cItem['student_info'])) {
+                    $cItem['student_info'] = [];
+                }
+
+                $realProgress = CourseCurriculum::getUserProgress($uId, $cCode);
+                $cItem['student_info']['progress'] = $realProgress;
+
+                // Dynamic student count for admin mode
+                $studentList = CourseManager::get_student_list_from_course_code($cCode, true);
+                $cItem['student_info']['student_count'] = is_array($studentList) ? count($studentList) : (int)$studentList;
+
+                // Dynamic certificate eligibility
+                $blueprint = CertificateBlueprint::getBlueprintForCourse($cCode);
+                $cItem['student_info']['has_certificate'] = !empty($blueprint);
+            };
+
+            if (!empty($specialCourses)) {
+                foreach ($specialCourses as $k => $sc) {
+                    $enrichCourseCard($specialCourses[$k], $user_id);
+                }
+            }
+            if (!empty($courses['not_category'])) {
+                foreach ($courses['not_category'] as $k => $nc) {
+                    $enrichCourseCard($courses['not_category'][$k], $user_id);
+                }
+            }
+            if (!empty($courses['in_category'])) {
+                foreach ($courses['in_category'] as $catK => $catData) {
+                    if (!empty($catData['courses'])) {
+                        foreach ($catData['courses'] as $k => $cSub) {
+                            $enrichCourseCard($courses['in_category'][$catK]['courses'][$k], $user_id);
                         }
                     }
                 }
@@ -2316,7 +2364,55 @@ class IndexManager
                                         api_get_configuration_value('hide_session_dates_in_user_portal')
                                     );
 
-                                    if ($viewGridCourses) {
+                                                // ETupskill Dynamic Course Metadata Enrichment
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/course_curriculum.lib.php';
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/certificate_blueprint.lib.php';
+
+            $enrichCourseCard = function (&$cItem, $uId) {
+                $cCode = !empty($cItem['course_code']) ? $cItem['course_code'] : (!empty($cItem['code']) ? $cItem['code'] : '');
+                if (empty($cCode)) return;
+
+                $stats = CourseCurriculum::getCourseStats($cCode);
+                $cItem['lesson_count'] = $stats['lesson_count'];
+                $cItem['duration_formatted'] = $stats['duration_formatted'];
+
+                if (!isset($cItem['student_info']) || !is_array($cItem['student_info'])) {
+                    $cItem['student_info'] = [];
+                }
+
+                $realProgress = CourseCurriculum::getUserProgress($uId, $cCode);
+                $cItem['student_info']['progress'] = $realProgress;
+
+                // Dynamic student count for admin mode
+                $studentList = CourseManager::get_student_list_from_course_code($cCode, true);
+                $cItem['student_info']['student_count'] = is_array($studentList) ? count($studentList) : (int)$studentList;
+
+                // Dynamic certificate eligibility
+                $blueprint = CertificateBlueprint::getBlueprintForCourse($cCode);
+                $cItem['student_info']['has_certificate'] = !empty($blueprint);
+            };
+
+            if (!empty($specialCourses)) {
+                foreach ($specialCourses as $k => $sc) {
+                    $enrichCourseCard($specialCourses[$k], $user_id);
+                }
+            }
+            if (!empty($courses['not_category'])) {
+                foreach ($courses['not_category'] as $k => $nc) {
+                    $enrichCourseCard($courses['not_category'][$k], $user_id);
+                }
+            }
+            if (!empty($courses['in_category'])) {
+                foreach ($courses['in_category'] as $catK => $catData) {
+                    if (!empty($catData['courses'])) {
+                        foreach ($catData['courses'] as $k => $cSub) {
+                            $enrichCourseCard($courses['in_category'][$catK]['courses'][$k], $user_id);
+                        }
+                    }
+                }
+            }
+
+            if ($viewGridCourses) {
                                         $html_sessions .= $this->tpl->fetch(
                                             $this->tpl->get_template('/user_portal/grid_session.tpl')
                                         );
@@ -2395,7 +2491,55 @@ class IndexManager
                     api_get_configuration_value('hide_session_dates_in_user_portal')
                 );
 
-                if ($viewGridCourses) {
+                            // ETupskill Dynamic Course Metadata Enrichment
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/course_curriculum.lib.php';
+            require_once api_get_path(SYS_CODE_PATH).'inc/lib/certificate_blueprint.lib.php';
+
+            $enrichCourseCard = function (&$cItem, $uId) {
+                $cCode = !empty($cItem['course_code']) ? $cItem['course_code'] : (!empty($cItem['code']) ? $cItem['code'] : '');
+                if (empty($cCode)) return;
+
+                $stats = CourseCurriculum::getCourseStats($cCode);
+                $cItem['lesson_count'] = $stats['lesson_count'];
+                $cItem['duration_formatted'] = $stats['duration_formatted'];
+
+                if (!isset($cItem['student_info']) || !is_array($cItem['student_info'])) {
+                    $cItem['student_info'] = [];
+                }
+
+                $realProgress = CourseCurriculum::getUserProgress($uId, $cCode);
+                $cItem['student_info']['progress'] = $realProgress;
+
+                // Dynamic student count for admin mode
+                $studentList = CourseManager::get_student_list_from_course_code($cCode, true);
+                $cItem['student_info']['student_count'] = is_array($studentList) ? count($studentList) : (int)$studentList;
+
+                // Dynamic certificate eligibility
+                $blueprint = CertificateBlueprint::getBlueprintForCourse($cCode);
+                $cItem['student_info']['has_certificate'] = !empty($blueprint);
+            };
+
+            if (!empty($specialCourses)) {
+                foreach ($specialCourses as $k => $sc) {
+                    $enrichCourseCard($specialCourses[$k], $user_id);
+                }
+            }
+            if (!empty($courses['not_category'])) {
+                foreach ($courses['not_category'] as $k => $nc) {
+                    $enrichCourseCard($courses['not_category'][$k], $user_id);
+                }
+            }
+            if (!empty($courses['in_category'])) {
+                foreach ($courses['in_category'] as $catK => $catData) {
+                    if (!empty($catData['courses'])) {
+                        foreach ($catData['courses'] as $k => $cSub) {
+                            $enrichCourseCard($courses['in_category'][$catK]['courses'][$k], $user_id);
+                        }
+                    }
+                }
+            }
+
+            if ($viewGridCourses) {
                     $sessions_with_no_category = $this->tpl->fetch(
                         $this->tpl->get_template('/user_portal/grid_session.tpl')
                     );

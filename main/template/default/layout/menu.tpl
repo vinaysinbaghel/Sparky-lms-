@@ -41,6 +41,16 @@
                             </div>
                         </li>
                         <li role="separator" class="divider"></li>
+                        <li class="user-body">
+                            <a title="{{ "EditProfile"|get_lang }}" href="{{ _p.web_main }}auth/profile.php">
+                                <em class="fa fa-user-circle" aria-hidden="true"></em> {{ "EditProfile"|get_lang }}
+                            </a>
+                        </li>
+                        <li class="user-body">
+                            <a title="{{ "PersonalDataReport"|get_lang }}" href="{{ _p.web_main }}social/personal_data.php">
+                                <em class="fa fa-shield" aria-hidden="true"></em> {{ "PersonalDataReport"|get_lang }}
+                            </a>
+                        </li>
                         {% if message_url %}
                             <li class="user-body">
                                 <a title="{{ "Inbox"|get_lang }}" href="{{ message_url }}">
@@ -109,7 +119,7 @@
                     </button>
                 {% endif %}
             {% endif %}
-            <a class="navbar-brand" href="{{ _p.web }}"> <em class="fa fa-home"></em> </a>
+            <a class="navbar-brand" href="{% if _u.logged == 1 and (et_view_mode == 'learner' or _u.is_admin != 1) %}{{ _p.web }}user_portal.php{% else %}{{ _p.web }}{% endif %}"> <em class="fa fa-home"></em> </a>
         </div>
 
         <div id="navbar" class="collapse navbar-collapse">
@@ -177,55 +187,7 @@
                                     <span id="count_message" class="badge badge-warning"></span>
                                 </a>
                             </li>
-                            <li class="dropdown avatar-user" style="float:right">
-                                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button"
-                                   aria-expanded="false">
-                                    <img class="img-circle" src="{{ _u.avatar_small }}" alt="{{ _u.complete_name }}"/>
-                                    <span class="username-movil">{{ _u.complete_name }}</span>
-                                    <span class="caret"></span>
-                                </a>
-                                <ul class="dropdown-menu" role="menu">
-                                    <li class="user-header">
-                                        <div class="text-center">
-                                            <a href="{{ profile_url }}">
-                                                <img class="img-circle" src="{{ _u.avatar_medium }}" alt="{{ _u.complete_name }}"/>
-                                                <p class="name">{{ _u.complete_name }}</p>
-                                            </a>
-                                            <p><em class="fa fa-envelope-o" aria-hidden="true"></em> {{ _u.email }}</p>
-                                        </div>
-                                    </li>
-                                    <li role="separator" class="divider"></li>
-                                    {% if message_url %}
-                                        <li class="user-body">
-                                            <a title="{{ "Inbox"|get_lang }}" href="{{ message_url }}">
-                                                <em class="fa fa-envelope" aria-hidden="true"></em> {{ "Inbox"|get_lang }}
-                                            </a>
-                                        </li>
-                                    {% endif %}
-
-                                    {% if pending_survey_url %}
-                                        <li class="user-body">
-                                            <a href="{{ pending_survey_url }}">
-                                                <em class="fa fa-pie-chart"></em> {{ 'PendingSurveys'|get_lang }}
-                                            </a>
-                                        </li>
-                                    {% endif %}
-
-                                    {% if certificate_url %}
-                                        <li class="user-body">
-                                            <a title="{{ "MyCertificates"|get_lang }}" href="{{ certificate_url }}">
-                                                <em class="fa fa-graduation-cap"
-                                                    aria-hidden="true"></em> {{ "MyCertificates"|get_lang }}
-                                            </a>
-                                        </li>
-                                    {% endif %}
-
-                                    <li class="user-body">
-                                        <a id="logout_button" title="{{ "Logout"|get_lang }}" href="{{ logout_link }}">
-                                            <em class="fa fa-sign-out"></em> {{ "Logout"|get_lang }}
-                                        </a>
-                                    </li>
-                                </ul>
+                            </ul>
                             </li>
                         {% endif %}
                     {% endif %}
