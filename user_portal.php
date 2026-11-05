@@ -88,10 +88,6 @@ $load_dirs = api_get_setting('show_documents_preview');
 $displayMyCourseViewBySessionLink = api_get_setting('my_courses_view_by_session') === 'true';
 $viewMode = Session::read('et_view_mode');
 $isUserView = (!api_is_platform_admin() || $viewMode === 'learner' || empty($viewMode));
-if (!$isUserView) {
-    header('Location: '.api_get_path(WEB_PATH).'index.php');
-    exit;
-}
 $nameTools = $isUserView ? 'Dashboard' : get_lang('MyCourses');
 $loadHistory = isset($_GET['history']) && intval($_GET['history']) == 1 ? true : false;
 
