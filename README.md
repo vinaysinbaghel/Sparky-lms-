@@ -429,13 +429,13 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: 3306
-      DB_NAME: sparky_lms
-      DB_USER: sparky_user
-      DB_PASSWORD: ${DB_PASSWORD:-SparkySecurePass2026!}
+      DB_NAME: ${DB_NAME:-sparky_lms}
+      DB_USER: ${DB_USER:-sparky_user}
+      DB_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD must be set in .env file}
       APP_HOST: ${APP_HOST:-localhost}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-SparkyRedisPass2026!}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
     depends_on:
       db:
         condition: service_healthy
@@ -452,6 +452,8 @@ services:
     volumes:
       - .:/var/www/sparky-lms:ro
       - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/sparky-routes.inc:/etc/nginx/conf.d/sparky-routes.inc:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro
     depends_on:
       - app
 
@@ -460,10 +462,10 @@ services:
     container_name: sparky_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootSecurePass2026!}
-      MYSQL_DATABASE: sparky_lms
-      MYSQL_USER: sparky_user
-      MYSQL_PASSWORD: ${DB_PASSWORD:-SparkySecurePass2026!}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Error: MYSQL_ROOT_PASSWORD must be set in .env file}
+      MYSQL_DATABASE: ${DB_NAME:-sparky_lms}
+      MYSQL_USER: ${DB_USER:-sparky_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD must be set in .env file}
     volumes:
       - mariadb_data:/var/lib/mysql
       - ./database/sparky_clean_database.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
@@ -477,9 +479,11 @@ services:
     image: redis:7-alpine
     container_name: sparky_redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-SparkyRedisPass2026!}
+      --requirepass ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
       --maxmemory 512mb
       --maxmemory-policy noeviction
       --save 900 1
@@ -488,7 +492,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-SparkyRedisPass2026!}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -498,10 +502,17 @@ volumes:
   redis_data:
 ```
 
-Launch the cluster from repository root:
+### Setup & Launch
+1. Copy the environment file template and configure strong secrets:
+```bash
+cp .env.example .env
+# Edit .env and set strong passwords for DB_PASSWORD, MYSQL_ROOT_PASSWORD, and REDIS_PASSWORD
+```
+2. Launch the cluster:
 ```bash
 docker compose up -d
 ```
+3. Access Sparky LMS at `http://localhost` (HTTP) or `https://localhost` (HTTPS with self-signed SSL). For production certificates, mount your Let's Encrypt certificates into `docker/ssl/`.
 
 ---
 
@@ -602,20 +613,67 @@ Expected output:
   [PASS] composer.json exists
   [PASS] composer.json is valid JSON
   [PASS] composer.json declares PHP 8.1+ contract
+  [PASS] composer.json pins platform PHP to 8.3
   [PASS] composer.json has security audit blocking enabled
+  [PASS] composer.lock exists
+  [PASS] composer.lock platform php matches 8.1+
   [PASS] app/config/configuration.php.dist exists
   [PASS] docker-compose.yml exists
+  [PASS] docker-compose.yml has NO hardcoded fallback DB_PASSWORD (:-)
+  [PASS] docker-compose.yml has NO hardcoded fallback REDIS_PASSWORD (:-)
+  [PASS] docker-compose.yml has NO hardcoded fallback MYSQL_ROOT_PASSWORD (:-)
+  [PASS] docker-compose.yml mandates DB_PASSWORD via :? error syntax
+  [PASS] docker-compose.yml mandates MYSQL_ROOT_PASSWORD via :? error syntax
+  [PASS] docker-compose.yml mandates REDIS_PASSWORD via :? error syntax
+  [PASS] docker-compose.yml mounts SSL certificates directory
+  [PASS] docker-compose.yml mounts sparky routes include
+  [PASS] .env.example exists
+  [PASS] .env.example documents DB_PASSWORD
+  [PASS] .env.example documents MYSQL_ROOT_PASSWORD
+  [PASS] .env.example documents REDIS_PASSWORD
+  [PASS] .gitignore ignores .env
   [PASS] Dockerfile exists
+  [PASS] Dockerfile copies composer.json and composer.lock
+  [PASS] Dockerfile runs composer install
+  [PASS] Dockerfile sets up entrypoint script
+  [PASS] docker/entrypoint.sh exists
+  [PASS] docker/entrypoint.sh validates vendor/autoload.php presence
+  [PASS] docker/ssl/cert.pem exists
+  [PASS] docker/ssl/key.pem exists
+  [PASS] docker/ssl/cert.pem is non-empty
+  [PASS] docker/ssl/key.pem is non-empty
   [PASS] docker/nginx.conf exists
+  [PASS] docker/nginx.conf listens on HTTP (port 80)
+  [PASS] docker/nginx.conf listens on HTTPS (port 443 ssl)
+  [PASS] docker/nginx.conf references SSL cert and key
+  [PASS] docker/sparky-routes.inc exists
+  [PASS] docker/sparky-routes.inc blocks direct access to app/courses
+  [PASS] docker/sparky-routes.inc routes courses through download handlers (ZERO aliases to disk)
   [PASS] nginx.conf.sample exists
+  [PASS] nginx.conf.sample contains ZERO filesystem aliases into app/courses
+  [PASS] nginx.conf.sample blocks direct access to app/courses
+  [PASS] nginx.conf.sample routes course downloads via PHP handler
 
 --- 3. Web Server Access Controls & Negative Security Tests ---
+  [PASS] .htaccess exists
   [PASS] .htaccess blocks direct access to database/ directory
   [PASS] .htaccess blocks .sql dump files
+  [PASS] .htaccess blocks .bat scripts
+  [PASS] .htaccess blocks .sh shell scripts
+  [PASS] .htaccess sets X-Content-Type-Options nosniff
+  [PASS] .htaccess sets X-Frame-Options SAMEORIGIN
+  [PASS] .htaccess blocks direct access to app/courses
+  [PASS] .htaccess contains no direct disk rewrite to app/courses
+  [PASS] database/.htaccess exists (defense-in-depth)
   [PASS] database/.htaccess denies all access
+  [PASS] web.config exists
+  [PASS] web.config blocks database and sensitive files
+  [PASS] router.php exists
   [PASS] router.php blocks /database directory
   [PASS] router.php blocks /app/config directory
   [PASS] router.php blocks direct /app/courses directory access
+  [PASS] router.php blocks .sql extension
+  [PASS] router.php blocks .bat extension
   [PASS] router.php avoids wildcard CORS on media
 
 --- 4. Curriculum Upload & RCE Prevention Tests ---
@@ -623,6 +681,11 @@ Expected output:
   [PASS] Curriculum upload strictly rejects .phar archives
   [PASS] Curriculum upload strictly rejects .sh shell scripts
   [PASS] Curriculum upload strictly rejects .exe executables
+  [PASS] detectLessonTypeFromFilename identifies MP4 as video
+  [PASS] detectLessonTypeFromFilename identifies WEBM as video
+  [PASS] detectLessonTypeFromFilename identifies PDF as pdf
+  [PASS] detectLessonTypeFromFilename identifies MP3 as audio
+  [PASS] detectLessonTypeFromFilename identifies DOCX as document
 
 --- 5. Certificate Blueprints & XSS Sanitization Tests ---
   [PASS] Certificate rendering escapes XSS script tag in student name
@@ -653,7 +716,7 @@ Expected output:
   [PASS] Database contains table definition: `user_magic_token`
 
 ========================================================
-PASSED:   65
+PASSED:   101
 FAILED:   0
 WARNINGS: 0
 ========================================================

@@ -32,6 +32,9 @@ app/upload/*
 
 # Logs and databases #
 *.log
+.env
+.env.*
+!.env.example
 
 # IDE settings
 .idea

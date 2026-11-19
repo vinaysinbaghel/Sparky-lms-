@@ -26,38 +26,26 @@ RewriteRule ^certificates/$ certificates/index.php?id=%1 [L]
 RewriteRule ^courses/([^/]+)/?$ main/course_home/course_home.php?cDir=$1 [QSA,L]
 RewriteRule ^courses/([^/]+)/index.php$ main/course_home/course_home.php?cDir=$1 [QSA,L]
 
-# Rewrite everything in the scorm folder of a course to the download script
-# except JS, CSS and some image files, which can be served directly
-RewriteRule ^courses/([^/]+)/scorm/(.*\.(js|css|png|jpg|jpeg|gif))$ app/courses/$1/scorm/$2 [QSA,L]
+# Route all SCORM files through download script to enforce authorization
 RewriteRule ^courses/([^/]+)/scorm/(.*)$ main/document/download_scorm.php?doc_url=/$2&cDir=$1 [QSA,L]
 
-# Rewrite everything in the document folder of a course to the download script
-# Except certificate resources, which might need to be accessible publicly to all
-RewriteRule ^courses/([^/]+)/document/certificates/(.*)$ app/courses/$1/document/certificates/$2 [QSA,L]
-# Note : since version 2.4.38-3 of Apache a security fix had a side effect that broke redirections with spaces.
-# To fix this issue we did not have a common syntaxis but it work with one of those 2 options :
-# changing at the end of the following line [QSA,L] for [QSA,L,B=\x20?] or for "[QSA,L,B= ?,BNP]" (with the quotes)
-# We have opted to use the latter by default. If you are encountering "Not found" issues when entering course homepages,
-# you might want to try either of the other 2 forms.
+# Route all course documents through download script to enforce authorization
 RewriteRule ^courses/([^/]+)/document/(.*)$ main/document/download.php?doc_url=/$2&cDir=$1 "[QSA,L,B= ?,BNP]"
 
-# Optimize load of custom per-course icons in courses (avoid download_uploaded_files.php)
-RewriteRule ^courses/([^/]+)/upload/course_home_icons/(.*\.(js|css|png|jpg|jpeg|gif))$ app/courses/$1/upload/course_home_icons/$2 [QSA,L]
-# Course upload files
-# See note on line 37
+# Course upload files (Protected via download handler)
 RewriteRule ^courses/([^/]+)/upload/([^/]+)/(.*)$ main/document/download_uploaded_files.php?code=$1&type=$2&file=$3 "[QSA,L,B= ?,BNP]"
 
-# Rewrite everything in the work folder
-# See note on line 37
+# Course work folder (Protected via work handler)
 RewriteRule ^courses/([^/]+)/work/(.*)$ main/work/download.php?file=work/$2&cDir=$1 "[QSA,L,B= ?,BNP]"
 
+# Course thumbnails
 RewriteRule ^courses/([^/]+)/course-pic85x85.png$ main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_source [QSA,L]
 RewriteRule ^courses/([^/]+)/course-pic.png$ main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_large_source [QSA,L]
 RewriteRule ^courses/([^/]+)/course-email-pic-cropped.png$ main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_email_image_source [QSA,L]
 RewriteRule ^courses/([^/]+)/course-email-pic.png$ main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_email_image_large_source [QSA,L]
 
-# Redirect all courses/ to app/courses/
-RewriteRule ^courses/([^/]+)/(.*)$ app/courses/$1/$2 [QSA,L]
+# Route any other course asset through download handler (eliminates broad physical directory mapping)
+RewriteRule ^courses/([^/]+)/(.*)$ main/document/download.php?doc_url=/$2&cDir=$1 [QSA,L]
 
 # About session
 RewriteRule ^session/(\d{1,})/about/?$ main/session/about.php?session_id=$1 [QSA,L]
@@ -89,7 +77,7 @@ RewriteRule ^lti/os$ plugin/ims_lti/outcome_service.php [L]
 RewriteRule ^app/upload/users/([^/]+)/([^/]+)/my_files/(.*)$ main/social/download_my_files.php?user_id=$2&file=$3 "[QSA,L,B= ?,BNP]"
 
 # Deny access to sensitive directories
-RewriteRule ^(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache) - [F,L,NC]
+RewriteRule ^(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache|app/courses) - [F,L,NC]
 
 # Deny access to sensitive files and scripts
 RewriteRule \.(sql|bat|sh|yml|yaml|dist|lock|log|env|ini)$ - [F,L,NC]

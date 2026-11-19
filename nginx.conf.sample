@@ -105,35 +105,14 @@ server {
         rewrite ^/courses/([^/]+)/index\.php$ /main/course_home/course_home.php?cDir=$1 last;
     }
 
-    # SCORM static player assets (CSS/JS/images)
-    location ~* ^/courses/([^/]+)/scorm/(.*\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot))$ {
-        alias /var/www/sparky-lms/app/courses/$1/scorm/$2;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # SCORM content packages (Protected via download handler)
+    # SCORM content & assets (Strictly routed through download_scorm.php to verify enrollment & permissions)
     location ~* ^/courses/([^/]+)/scorm/(.*)$ {
         rewrite ^/courses/([^/]+)/scorm/(.*)$ /main/document/download_scorm.php?doc_url=/$2&cDir=$1 last;
-    }
-
-    # Certificate public verification resources
-    location ~* ^/courses/([^/]+)/document/certificates/(.*\.(?:png|jpg|jpeg|gif|svg|pdf))$ {
-        alias /var/www/sparky-lms/app/courses/$1/document/certificates/$2;
-        expires 7d;
-        add_header Cache-Control "public";
     }
 
     # Course document downloads (Protected via download handler)
     location ~* ^/courses/([^/]+)/document/(.*)$ {
         rewrite ^/courses/([^/]+)/document/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
-    }
-
-    # Course home icons
-    location ~* ^/courses/([^/]+)/upload/course_home_icons/(.*\.(?:js|css|png|jpg|jpeg|gif|svg))$ {
-        alias /var/www/sparky-lms/app/courses/$1/upload/course_home_icons/$2;
-        expires 30d;
-        add_header Cache-Control "public";
     }
 
     # Course upload files (Protected via download handler)
@@ -165,7 +144,7 @@ server {
     }
 
     # ANY OTHER COURSE ASSETS: Route through download handler to enforce enrollment & permissions
-    # (Removes the insecure public physical alias)
+    # (Enforces strict authorization via download handler instead of direct filesystem access)
     location ~* ^/courses/([^/]+)/(.*)$ {
         rewrite ^/courses/([^/]+)/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
     }

@@ -68,13 +68,66 @@ assertTest("composer.json exists", file_exists($composerJsonPath));
 $composerData = json_decode(file_get_contents($composerJsonPath), true);
 assertTest("composer.json is valid JSON", is_array($composerData));
 assertTest("composer.json declares PHP 8.1+ contract", isset($composerData['require']['php']) && strpos($composerData['require']['php'], '^8.1') !== false);
+assertTest("composer.json pins platform PHP to 8.3", isset($composerData['config']['platform']['php']) && version_compare($composerData['config']['platform']['php'], '8.1.0', '>='));
 assertTest("composer.json has security audit blocking enabled", isset($composerData['config']['audit']['block-insecure']) && $composerData['config']['audit']['block-insecure'] === true);
+
+$composerLockPath = $rootDir . '/composer.lock';
+assertTest("composer.lock exists", file_exists($composerLockPath));
+$composerLockContent = file_get_contents($composerLockPath);
+assertTest("composer.lock platform php matches 8.1+", strpos($composerLockContent, '"php": "^8.1') !== false);
 
 assertTest("app/config/configuration.php.dist exists", file_exists($rootDir . '/app/config/configuration.php.dist'));
 assertTest("docker-compose.yml exists", file_exists($rootDir . '/docker-compose.yml'));
+$dockerComposeContent = file_get_contents($rootDir . '/docker-compose.yml');
+assertTest("docker-compose.yml has NO hardcoded fallback DB_PASSWORD (:-)", strpos($dockerComposeContent, ':-SparkySecurePass') === false);
+assertTest("docker-compose.yml has NO hardcoded fallback REDIS_PASSWORD (:-)", strpos($dockerComposeContent, ':-SparkyRedisPass') === false);
+assertTest("docker-compose.yml has NO hardcoded fallback MYSQL_ROOT_PASSWORD (:-)", strpos($dockerComposeContent, ':-RootSecurePass') === false);
+assertTest("docker-compose.yml mandates DB_PASSWORD via :? error syntax", strpos($dockerComposeContent, 'DB_PASSWORD: ${DB_PASSWORD:?') !== false);
+assertTest("docker-compose.yml mandates MYSQL_ROOT_PASSWORD via :? error syntax", strpos($dockerComposeContent, 'MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?') !== false);
+assertTest("docker-compose.yml mandates REDIS_PASSWORD via :? error syntax", strpos($dockerComposeContent, 'REDIS_PASSWORD: ${REDIS_PASSWORD:?') !== false);
+assertTest("docker-compose.yml mounts SSL certificates directory", strpos($dockerComposeContent, './docker/ssl:/etc/nginx/ssl:ro') !== false);
+assertTest("docker-compose.yml mounts sparky routes include", strpos($dockerComposeContent, './docker/sparky-routes.inc:/etc/nginx/conf.d/sparky-routes.inc:ro') !== false);
+
+assertTest(".env.example exists", file_exists($rootDir . '/.env.example'));
+$envExampleContent = file_get_contents($rootDir . '/.env.example');
+assertTest(".env.example documents DB_PASSWORD", strpos($envExampleContent, 'DB_PASSWORD') !== false);
+assertTest(".env.example documents MYSQL_ROOT_PASSWORD", strpos($envExampleContent, 'MYSQL_ROOT_PASSWORD') !== false);
+assertTest(".env.example documents REDIS_PASSWORD", strpos($envExampleContent, 'REDIS_PASSWORD') !== false);
+
+$gitignoreContent = file_get_contents($rootDir . '/.gitignore');
+assertTest(".gitignore ignores .env", strpos($gitignoreContent, ".env\n") !== false || strpos($gitignoreContent, ".env\r\n") !== false);
+
 assertTest("Dockerfile exists", file_exists($rootDir . '/Dockerfile'));
+$dockerfileContent = file_get_contents($rootDir . '/Dockerfile');
+assertTest("Dockerfile copies composer.json and composer.lock", strpos($dockerfileContent, 'COPY composer.json composer.lock') !== false);
+assertTest("Dockerfile runs composer install", strpos($dockerfileContent, 'composer install') !== false);
+assertTest("Dockerfile sets up entrypoint script", strpos($dockerfileContent, 'ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]') !== false);
+
+assertTest("docker/entrypoint.sh exists", file_exists($rootDir . '/docker/entrypoint.sh'));
+$entrypointContent = file_get_contents($rootDir . '/docker/entrypoint.sh');
+assertTest("docker/entrypoint.sh validates vendor/autoload.php presence", strpos($entrypointContent, 'vendor/autoload.php') !== false);
+
+assertTest("docker/ssl/cert.pem exists", file_exists($rootDir . '/docker/ssl/cert.pem'));
+assertTest("docker/ssl/key.pem exists", file_exists($rootDir . '/docker/ssl/key.pem'));
+assertTest("docker/ssl/cert.pem is non-empty", filesize($rootDir . '/docker/ssl/cert.pem') > 500);
+assertTest("docker/ssl/key.pem is non-empty", filesize($rootDir . '/docker/ssl/key.pem') > 500);
+
 assertTest("docker/nginx.conf exists", file_exists($rootDir . '/docker/nginx.conf'));
+$dockerNginxContent = file_get_contents($rootDir . '/docker/nginx.conf');
+assertTest("docker/nginx.conf listens on HTTP (port 80)", strpos($dockerNginxContent, 'listen 80;') !== false);
+assertTest("docker/nginx.conf listens on HTTPS (port 443 ssl)", strpos($dockerNginxContent, 'listen 443 ssl') !== false);
+assertTest("docker/nginx.conf references SSL cert and key", strpos($dockerNginxContent, '/etc/nginx/ssl/cert.pem') !== false && strpos($dockerNginxContent, '/etc/nginx/ssl/key.pem') !== false);
+
+assertTest("docker/sparky-routes.inc exists", file_exists($rootDir . '/docker/sparky-routes.inc'));
+$sparkyRoutesContent = file_get_contents($rootDir . '/docker/sparky-routes.inc');
+assertTest("docker/sparky-routes.inc blocks direct access to app/courses", strpos($sparkyRoutesContent, 'app/courses') !== false);
+assertTest("docker/sparky-routes.inc routes courses through download handlers (ZERO aliases to disk)", strpos($sparkyRoutesContent, 'alias') === false);
+
 assertTest("nginx.conf.sample exists", file_exists($rootDir . '/nginx.conf.sample'));
+$sampleNginxContent = file_get_contents($rootDir . '/nginx.conf.sample');
+assertTest("nginx.conf.sample contains ZERO filesystem aliases into app/courses", strpos($sampleNginxContent, 'alias') === false);
+assertTest("nginx.conf.sample blocks direct access to app/courses", strpos($sampleNginxContent, 'app/courses') !== false);
+assertTest("nginx.conf.sample routes course downloads via PHP handler", strpos($sampleNginxContent, 'download.php') !== false);
 
 // -----------------------------------------------------------------------------
 // 3. SECURITY BOUNDARIES & ACCESS CONTROLS (Negative Tests)
@@ -91,6 +144,8 @@ assertTest(".htaccess blocks .bat scripts", strpos($htaccessContent, 'bat') !== 
 assertTest(".htaccess blocks .sh shell scripts", strpos($htaccessContent, 'sh') !== false);
 assertTest(".htaccess sets X-Content-Type-Options nosniff", strpos($htaccessContent, 'X-Content-Type-Options') !== false);
 assertTest(".htaccess sets X-Frame-Options SAMEORIGIN", strpos($htaccessContent, 'X-Frame-Options') !== false);
+assertTest(".htaccess blocks direct access to app/courses", strpos($htaccessContent, 'app/courses') !== false);
+assertTest(".htaccess contains no direct disk rewrite to app/courses", strpos($htaccessContent, 'app/courses/$1/$2') === false);
 
 // Test database/.htaccess
 $dbHtaccess = $rootDir . '/database/.htaccess';

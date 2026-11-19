@@ -33,7 +33,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 RUN pecl install redis \
     && docker-php-ext-enable redis
 
-# Install Composer
+# Install Composer from official multi-stage image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Set working directory
@@ -55,7 +55,28 @@ RUN { \
         echo 'session.use_only_cookies = 1'; \
     } > /usr/local/etc/php/conf.d/sparky-production.ini
 
+# Copy composer definitions and install dependencies
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --no-interaction \
+    --no-progress \
+    --optimize-autoloader \
+    --ignore-platform-reqs
+
+# Copy application source code
+COPY . .
+
+# Copy entrypoint script and configure runtime permissions
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && chown -R www-data:www-data /var/www/sparky-lms \
+    && chmod -R 755 /var/www/sparky-lms \
+    && chmod -R 775 /var/www/sparky-lms/app/cache /var/www/sparky-lms/app/logs /var/www/sparky-lms/app/upload /var/www/sparky-lms/app/courses 2>/dev/null || true
+
 # Expose PHP-FPM port
 EXPOSE 9000
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm"]

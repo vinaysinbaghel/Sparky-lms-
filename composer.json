@@ -199,6 +199,9 @@
     "config": {
         "sort-packages": true,
         "component-dir": "web/assets",
+        "platform": {
+            "php": "8.3.0"
+        },
         "audit": {
             "block-insecure": true
         }

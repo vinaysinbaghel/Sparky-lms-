@@ -167,14 +167,7 @@ if (preg_match('#^/courses/([^/]+)/course-pic(85x85|-email-pic-cropped|-email-pi
     exit;
 }
 
-// SCORM assets vs player
-if (preg_match('#^/courses/([^/]+)/scorm/(.*\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot))$#i', $uri, $matches)) {
-    $appFile = $docRoot . '/app/courses/' . $matches[1] . '/scorm/' . $matches[2];
-    if (is_file($appFile)) {
-        serveStaticFile($appFile);
-        exit;
-    }
-}
+// SCORM content & assets (Strictly routed through download_scorm.php to verify enrollment & permissions)
 if (preg_match('#^/courses/([^/]+)/scorm/(.*)$#', $uri, $matches)) {
     $_GET['doc_url'] = '/' . $matches[2];
     $_GET['cDir'] = $matches[1];
@@ -188,16 +181,7 @@ if (preg_match('#^/courses/([^/]+)/scorm/(.*)$#', $uri, $matches)) {
     exit;
 }
 
-// Course document certificates
-if (preg_match('#^/courses/([^/]+)/document/certificates/(.*)$#', $uri, $matches)) {
-    $appFile = $docRoot . '/app/courses/' . $matches[1] . '/document/certificates/' . $matches[2];
-    if (is_file($appFile)) {
-        serveStaticFile($appFile);
-        exit;
-    }
-}
-
-// Course document download
+// Course document downloads & certificates (Strictly routed through download.php)
 if (preg_match('#^/courses/([^/]+)/document/(.*)$#', $uri, $matches)) {
     $_GET['doc_url'] = '/' . $matches[2];
     $_GET['cDir'] = $matches[1];
@@ -212,13 +196,6 @@ if (preg_match('#^/courses/([^/]+)/document/(.*)$#', $uri, $matches)) {
 }
 
 // Course upload files
-if (preg_match('#^/courses/([^/]+)/upload/course_home_icons/(.*\.(?:js|css|png|jpg|jpeg|gif|svg))$#i', $uri, $matches)) {
-    $appFile = $docRoot . '/app/courses/' . $matches[1] . '/upload/course_home_icons/' . $matches[2];
-    if (is_file($appFile)) {
-        serveStaticFile($appFile);
-        exit;
-    }
-}
 if (preg_match('#^/courses/([^/]+)/upload/([^/]+)/(.*)$#', $uri, $matches)) {
     $_GET['code'] = $matches[1];
     $_GET['type'] = $matches[2];
@@ -253,25 +230,7 @@ if (preg_match('#^/courses/([^/]+)/(.*)$#', $uri, $matches)) {
     $cDir = $matches[1];
     $relFile = $matches[2];
 
-    // Explicitly allow course home icons
-    if (preg_match('#^upload/course_home_icons/.*\.(?:js|css|png|jpg|jpeg|gif|svg)$#i', $relFile)) {
-        $appFile = $docRoot . '/app/courses/' . $cDir . '/' . $relFile;
-        if (is_file($appFile)) {
-            serveStaticFile($appFile);
-            exit;
-        }
-    }
-
-    // Explicitly allow certificate public verification assets
-    if (preg_match('#^document/certificates/.*\.(?:png|jpg|jpeg|gif|svg|pdf)$#i', $relFile)) {
-        $appFile = $docRoot . '/app/courses/' . $cDir . '/' . $relFile;
-        if (is_file($appFile)) {
-            serveStaticFile($appFile);
-            exit;
-        }
-    }
-
-    // All other course files MUST be protected through download handler
+    // All course files MUST be protected through download handler
     $_GET['doc_url'] = '/' . ltrim($relFile, '/');
     $_GET['cDir'] = $cDir;
     $_REQUEST['doc_url'] = '/' . ltrim($relFile, '/');
