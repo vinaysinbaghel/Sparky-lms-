@@ -1,0 +1,164 @@
+# ==============================================================================
+# Sparky LMS - Production Nginx Configuration Sample
+# ==============================================================================
+# Place or include this file in your /etc/nginx/sites-available/sparkylms.conf
+# Replace 'example.com' with your actual domain and adjust fastcgi_pass socket.
+# ==============================================================================
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name example.com www.example.com;
+
+    # Redirect all HTTP traffic to HTTPS in production
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name example.com www.example.com;
+
+    root /var/www/sparkylms;
+    index index.php index.html index.htm;
+
+    # SSL Certificates
+    # ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+    # ssl_protocols TLSv1.2 TLSv1.3;
+    # ssl_ciphers HIGH:!aNULL:!MD5;
+
+    # Client upload limits for video/SCORM course content
+    client_max_body_size 512M;
+    client_body_timeout 300s;
+
+    # Security Headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # 1. BLOCK SENSITIVE DIRECTORIES & FILES
+    location ~ ^/(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache) {
+        deny all;
+        return 403;
+    }
+
+    # Block access to database backups, bat/sh scripts, configs, and hidden files
+    location ~* \.(sql|bat|sh|yml|yaml|dist|lock|log|env|ini)$ {
+        deny all;
+        return 403;
+    }
+
+    location ~* /(composer\.json|composer\.lock|bower\.json|web\.config|\.gitignore|\.gitattributes|\.editorconfig|\.htaccess|README\.md)$ {
+        deny all;
+        return 403;
+    }
+
+    # Prevent direct PHP execution in user upload folders
+    location ~* ^/app/(upload|courses|cache|logs)/.*\.php$ {
+        deny all;
+        return 403;
+    }
+
+    # 2. SPARKY LMS REWRITE RULES
+    location = /certificates/ {
+        rewrite ^/certificates/$ /certificates/index.php last;
+    }
+
+    location ~* ^/courses/([^/]+)/?$ {
+        rewrite ^/courses/([^/]+)/?$ /main/course_home/course_home.php?cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/index\.php$ {
+        rewrite ^/courses/([^/]+)/index\.php$ /main/course_home/course_home.php?cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/scorm/(.*\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot))$ {
+        alias /var/www/sparkylms/app/courses/$1/scorm/$2;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location ~* ^/courses/([^/]+)/scorm/(.*)$ {
+        rewrite ^/courses/([^/]+)/scorm/(.*)$ /main/document/download_scorm.php?doc_url=/$2&cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/document/certificates/(.*)$ {
+        alias /var/www/sparkylms/app/courses/$1/document/certificates/$2;
+    }
+
+    location ~* ^/courses/([^/]+)/document/(.*)$ {
+        rewrite ^/courses/([^/]+)/document/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/upload/course_home_icons/(.*\.(?:js|css|png|jpg|jpeg|gif|svg))$ {
+        alias /var/www/sparkylms/app/courses/$1/upload/course_home_icons/$2;
+    }
+
+    location ~* ^/courses/([^/]+)/upload/([^/]+)/(.*)$ {
+        rewrite ^/courses/([^/]+)/upload/([^/]+)/(.*)$ /main/document/download_uploaded_files.php?code=$1&type=$2&file=$3 last;
+    }
+
+    location ~* ^/courses/([^/]+)/work/(.*)$ {
+        rewrite ^/courses/([^/]+)/work/(.*)$ /main/work/download.php?file=work/$2&cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/course-pic85x85\.png$ {
+        rewrite ^ /main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_source last;
+    }
+
+    location ~* ^/courses/([^/]+)/course-pic\.png$ {
+        rewrite ^ /main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_large_source last;
+    }
+
+    location ~* ^/courses/([^/]+)/(.*)$ {
+        alias /var/www/sparkylms/app/courses/$1/$2;
+    }
+
+    location ~* ^/session/([0-9]+)/about/?$ {
+        rewrite ^ /main/session/about.php?session_id=$1 last;
+    }
+
+    location ~* ^/course/([0-9]+)/about/?$ {
+        rewrite ^ /main/course_info/about.php?course_id=$1 last;
+    }
+
+    # 3. VIDEO & AUDIO STREAMING WITH HTTP RANGE SUPPORT (206 Partial Content)
+    location ~* \.(mp4|webm|mkv|mov|ogg|ogv|mp3|wav|m4a|aac|flac|pdf)$ {
+        # Nginx natively handles HTTP byte ranges (206 Partial Content) efficiently
+        expires 7d;
+        add_header Cache-Control "public";
+        add_header Accept-Ranges bytes;
+        try_files $uri =404;
+    }
+
+    # 4. STATIC ASSET CACHING
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+        try_files $uri =404;
+    }
+
+    # 5. PHP-FPM PROCESSING
+    location ~ \.php$ {
+        try_files $uri =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        
+        # Adjust PHP-FPM socket path to your installed PHP version:
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+
+        fastcgi_read_timeout 300;
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 256 16k;
+        fastcgi_busy_buffers_size 256k;
+        fastcgi_temp_file_write_size 256k;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+}

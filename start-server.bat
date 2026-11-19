@@ -11,7 +11,11 @@ if "%ERRORLEVEL%"=="0" (
     echo [OK] MariaDB is already running.
 ) else (
     echo Starting MariaDB...
-    start "" /B "C:\Users\vinay.baghel\AppData\Local\Programs\mariadb\bin\mysqld.exe" --defaults-file="C:\Users\vinay.baghel\AppData\Local\Programs\mariadb\data\my.ini"
+    if exist "%LOCALAPPDATA%\Programs\mariadb\bin\mysqld.exe" (
+        start "" /B "%LOCALAPPDATA%\Programs\mariadb\bin\mysqld.exe" --defaults-file="%LOCALAPPDATA%\Programs\mariadb\data\my.ini"
+    ) else (
+        start "" /B mysqld
+    )
     timeout /t 2 /nobreak >nul
     echo [OK] MariaDB started.
 )
@@ -23,7 +27,11 @@ if "%ERRORLEVEL%"=="0" (
 ) else (
     echo Starting PHP development server with media streaming router...
     cd /d "%~dp0"
-    start "Sparky LMS Server" "C:\Users\vinay.baghel\AppData\Local\Programs\php83\php.exe" -S localhost:8000 router.php
+    if exist "%LOCALAPPDATA%\Programs\php83\php.exe" (
+        start "Sparky LMS Server" "%LOCALAPPDATA%\Programs\php83\php.exe" -S localhost:8000 router.php
+    ) else (
+        start "Sparky LMS Server" php -S localhost:8000 router.php
+    )
     timeout /t 2 /nobreak >nul
     echo [OK] PHP server started on http://localhost:8000
 )

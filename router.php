@@ -8,13 +8,53 @@
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $uri = rawurldecode($uri);
 
-// Security: Block directory traversal and sensitive directories from direct web access
-if (
-    strpos($uri, '..') !== false ||
-    strpos($uri, '/.git') === 0 ||
-    strpos($uri, '/scratch/') === 0 ||
-    strpos($uri, '/app/config/') === 0
-) {
+// Security: Comprehensive protection against directory traversal, sensitive folders, and config leaks
+$cleanUri = '/' . ltrim(str_replace('\\', '/', $uri), '/');
+$uriExt = strtolower(pathinfo($cleanUri, PATHINFO_EXTENSION));
+$uriBase = basename($cleanUri);
+
+$blockedPrefixes = [
+    '/.git', '/.github', '/database', '/scratch', '/bin', '/tests',
+    '/app/config', '/app/logs', '/app/cache'
+];
+
+$blockedExtensions = [
+    'sql', 'bat', 'sh', 'yml', 'yaml', 'dist', 'lock', 'env', 'log', 'ini', 'md'
+];
+
+$blockedFiles = [
+    'composer.json', 'composer.lock', 'bower.json', 'web.config',
+    '.gitignore', '.gitattributes', '.editorconfig', '.htaccess',
+    '.travis.yml', '.codeclimate.yml', '.scrutinizer.yml',
+    'push-to-github.bat', 'start-server.bat'
+];
+
+$isForbidden = false;
+
+// Directory traversal
+if (strpos($cleanUri, '..') !== false) {
+    $isForbidden = true;
+}
+
+// Sensitive directory access
+foreach ($blockedPrefixes as $prefix) {
+    if (strpos($cleanUri, $prefix . '/') === 0 || $cleanUri === $prefix) {
+        $isForbidden = true;
+        break;
+    }
+}
+
+// Sensitive extensions & files
+if (in_array($uriExt, $blockedExtensions, true) || in_array(strtolower($uriBase), $blockedFiles, true)) {
+    $isForbidden = true;
+}
+
+// Prevent direct script execution from upload & cache directories
+if (preg_match('#^/app/(upload|cache|logs)/.*\.ph(p[34578]?|t|tml|ar)$#i', $cleanUri)) {
+    $isForbidden = true;
+}
+
+if ($isForbidden) {
     http_response_code(403);
     echo "403 Forbidden";
     exit;

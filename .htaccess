@@ -88,8 +88,20 @@ RewriteRule ^lti/os$ plugin/ims_lti/outcome_service.php [L]
 # See note on line 37
 RewriteRule ^app/upload/users/([^/]+)/([^/]+)/my_files/(.*)$ main/social/download_my_files.php?user_id=$2&file=$3 "[QSA,L,B= ?,BNP]"
 
-# Deny access
-RewriteRule ^(tests|.git) - [F,L,NC]
+# Deny access to sensitive directories
+RewriteRule ^(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache) - [F,L,NC]
+
+# Deny access to sensitive files and scripts
+RewriteRule \.(sql|bat|sh|yml|yaml|dist|lock|log|env|ini)$ - [F,L,NC]
+
+<FilesMatch "^(composer\.json|composer\.lock|bower\.json|web\.config|\.gitignore|\.gitattributes|\.editorconfig|\.htaccess|README\.md|\.travis\.yml|\.codeclimate\.yml|\.scrutinizer\.yml)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
 
 # Add caching of woff font files to avoid loading 2*15KB each time with Chamilo
 # default OpenSans font
@@ -116,14 +128,13 @@ AddType application/font-woff .woff .woff2
 # Disallow direct access to /main/inc/lib/javascript/bigupload/files
 RedirectMatch 403 ^/main/inc/lib/javascript/bigupload/files
 
-# Disallow MIME sniffing to prevent XSS from unknown/incorrect file extensions
+# Security headers to prevent MIME sniffing, clickjacking, and XSS
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options nosniff
+  Header always set X-Frame-Options SAMEORIGIN
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
-
-<Files "web.config">
-  Require all denied
-</Files>
 
 <IfModule mod_autoindex.c>
   Options -Indexes

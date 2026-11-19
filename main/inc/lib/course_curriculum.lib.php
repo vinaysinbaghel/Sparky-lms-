@@ -152,16 +152,52 @@ public static function formatVideoEmbedUrl($url)
         $mimeType = !empty($fileArray['type']) ? $fileArray['type'] : mime_content_type($fileArray['tmp_name']);
         $detectedType = self::detectLessonTypeFromFilename($origName);
 
-        // Sanitize filename
+        // Security: Whitelist allowed file extensions for curriculum materials
+        $allowedExts = [
+            // Video formats
+            'mp4', 'webm', 'mkv', 'mov', 'm4v', 'avi', 'flv', 'wmv', 'ogv', '3gp',
+            // Audio formats
+            'mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma',
+            // Document formats
+            'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'epub', 'rtf', 'odt', 'csv',
+            // Archives & Images
+            'zip', 'rar', '7z', 'jpg', 'jpeg', 'png', 'webp', 'gif'
+        ];
+
+        // Sanitize course code to prevent path traversal
+        $courseCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $courseCode);
+        if (empty($courseCode)) {
+            return false;
+        }
+
+        // Sanitize filename & validate extension
         $fileInfo = pathinfo($origName);
-        $ext = strtolower($fileInfo['extension']);
+        $ext = strtolower(isset($fileInfo['extension']) ? $fileInfo['extension'] : '');
+        if (empty($ext) || !in_array($ext, $allowedExts, true)) {
+            return false;
+        }
+
+        // Explicitly block any executable or script extensions
+        $dangerousExts = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'php8', 'phar', 'inc', 'pl', 'py', 'cgi', 'sh', 'bash', 'bat', 'cmd', 'exe', 'dll', 'so', 'vbs', 'js', 'jsp', 'asp', 'aspx', 'htaccess', 'htpasswd'];
+        if (in_array($ext, $dangerousExts, true)) {
+            return false;
+        }
+
         $cleanBase = preg_replace('/[^a-zA-Z0-9_-]/', '_', $fileInfo['filename']);
-        $savedFileName = $cleanBase . '_' . time() . '.' . $ext;
+        $savedFileName = $cleanBase . '_' . time() . '_' . substr(md5(uniqid()), 0, 8) . '.' . $ext;
 
         // Ensure physical upload directory exists
         $uploadSysDir = api_get_path(SYS_APP_PATH) . 'upload/curriculum/' . $courseCode . '/';
         if (!is_dir($uploadSysDir)) {
-            @mkdir($uploadSysDir, 0777, true);
+            @mkdir($uploadSysDir, 0755, true);
+        }
+
+        // Protect curriculum upload directory from script execution and directory browsing
+        $curriculumBaseDir = api_get_path(SYS_APP_PATH) . 'upload/curriculum/';
+        if (!file_exists($curriculumBaseDir . '.htaccess')) {
+            $htContent = "<IfModule mod_authz_core.c>\n    <FilesMatch \"\\.(ph(p[34578]?|t|tml|ar)|cgi|pl|py|sh|bash|bat|exe|dll)$\">\n        Require all denied\n    </FilesMatch>\n</IfModule>\n<IfModule !mod_authz_core.c>\n    <FilesMatch \"\\.(ph(p[34578]?|t|tml|ar)|cgi|pl|py|sh|bash|bat|exe|dll)$\">\n        Deny from all\n    </FilesMatch>\n</IfModule>\nOptions -Indexes -ExecCGI\n";
+            @file_put_contents($curriculumBaseDir . '.htaccess', $htContent);
+            @file_put_contents($curriculumBaseDir . 'index.html', '<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1></body></html>');
         }
 
         $destSysPath = $uploadSysDir . $savedFileName;

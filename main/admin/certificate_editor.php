@@ -96,14 +96,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_blueprint'])) {
     if (isset($_FILES['bg_image_file']) && $_FILES['bg_image_file']['error'] === UPLOAD_ERR_OK) {
         $uploadDir = api_get_path(SYS_APP_PATH).'upload/certificates/';
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+            mkdir($uploadDir, 0755, true);
         }
         $fileInfo = pathinfo($_FILES['bg_image_file']['name']);
-        $ext = strtolower($fileInfo['extension']);
-        $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'svg', 'gif'];
+        $ext = strtolower(isset($fileInfo['extension']) ? $fileInfo['extension'] : '');
+        // Disallow svg to prevent Stored XSS via script execution
+        $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         
-        if (in_array($ext, $allowedExts)) {
-            $newFileName = 'cert_bg_'.time().'_'.uniqid().'.'.$ext;
+        if (in_array($ext, $allowedExts, true)) {
+            $newFileName = 'cert_bg_'.time().'_'.bin2hex(random_bytes(8)).'.'.$ext;
             $destPath = $uploadDir.$newFileName;
             if (move_uploaded_file($_FILES['bg_image_file']['tmp_name'], $destPath)) {
                 $bgImage = api_get_path(WEB_APP_PATH).'upload/certificates/'.$newFileName;

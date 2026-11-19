@@ -52,13 +52,37 @@ if (empty($courseCode)) {
 
 $currentUserId = api_get_user_id();
 
-// Verify access permissions
-$isAllowed = api_is_platform_admin() || api_is_platform_admin_by_id() || api_is_course_admin() || CourseManager::is_course_teacher($currentUserId, $courseCode) || ($currentUserId > 0 && CourseManager::is_user_subscribed_in_course($currentUserId, $courseCode));
-
-if (!$isAllowed && $currentUserId <= 0) {
+// Security: User must be authenticated
+if ($currentUserId <= 0) {
+    http_response_code(401);
     echo json_encode([
         'success' => false,
         'error' => 'Your session has expired. Please refresh the page and log in again.'
+    ]);
+    exit;
+}
+
+// Verify access permissions: platform admin, course admin, or assigned course teacher
+$canEdit = api_is_platform_admin() || api_is_platform_admin_by_id() || api_is_course_admin() || CourseManager::is_course_teacher($currentUserId, $courseCode);
+$isSubscribed = CourseManager::is_user_subscribed_in_course($currentUserId, $courseCode);
+
+// Write actions (upload, delete, edit) strictly require teacher or admin privileges
+$writeActions = ['ajax_upload_lesson_media', 'upload_media', 'ajax_delete_chapter', 'ajax_delete_lesson'];
+if (in_array($action, $writeActions, true) && !$canEdit) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Access denied: You do not have permission to modify this course curriculum.'
+    ]);
+    exit;
+}
+
+// Read actions require subscription or edit privileges
+if (!$canEdit && !$isSubscribed) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Access denied: You are not enrolled in this course.'
     ]);
     exit;
 }
