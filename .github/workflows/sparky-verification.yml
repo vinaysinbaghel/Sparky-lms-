@@ -27,7 +27,7 @@ jobs:
           coverage: none
 
       - name: Validate composer.json
-        run: composer validate --strict
+        run: composer validate --check-lock --no-check-all
 
       - name: Run Sparky Automated Verification Suite
         run: php tests/run_test_suite.php

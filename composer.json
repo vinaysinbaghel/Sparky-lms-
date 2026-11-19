@@ -3,7 +3,7 @@
     "description": "E-learning and collaboration software",
     "type": "project",
     "homepage": "http://www.chamilo.org",
-    "license": "GPL-3.0",
+    "license": "GPL-3.0-or-later",
     "support": {
         "docs": "https://docs.chamilo.org/",
         "forum": "https://forum.chamilo.org/",
