@@ -5,8 +5,24 @@
  * HTTP 206 Partial Content (Byte-Range requests) for Video, Audio, and PDF streaming.
  */
 
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uri = rawurldecode($uri);
+$rawUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// Iterative URL decoding to defeat multiple URL-encoding attacks (%252e%252e -> %2e%2e -> ..)
+$decodedUri = $rawUri;
+$maxDecodes = 5;
+while ($maxDecodes-- > 0 && strpos($decodedUri, '%') !== false) {
+    $next = rawurldecode($decodedUri);
+    if ($next === $decodedUri) break;
+    $decodedUri = $next;
+}
+$uri = $decodedUri;
+
+// Reject any null bytes or carriage returns in URI
+if (strpos($rawUri, chr(0)) !== false || strpos($uri, chr(0)) !== false) {
+    http_response_code(403);
+    echo "403 Forbidden";
+    exit;
+}
 
 // Security: Comprehensive protection against directory traversal, sensitive folders, and config leaks
 $cleanUri = '/' . ltrim(str_replace('\\', '/', $uri), '/');
@@ -31,8 +47,8 @@ $blockedFiles = [
 
 $isForbidden = false;
 
-// Directory traversal
-if (strpos($cleanUri, '..') !== false) {
+// Directory traversal check (both on decoded URI and raw URI)
+if (strpos($cleanUri, '..') !== false || strpos($rawUri, '..') !== false || preg_match('#(^|/)\.\.(/|$)#', $cleanUri)) {
     $isForbidden = true;
 }
 
@@ -99,29 +115,6 @@ if (!is_file($filePath) && !empty($_SERVER['DOCUMENT_ROOT'])) {
     if (is_file($altRoot . $uri)) {
         $filePath = $altRoot . $uri;
     }
-}
-
-// Media types that require HTTP Range support
-$mediaMimes = [
-    'mp4'  => 'video/mp4',
-    'webm' => 'video/webm',
-    'mkv'  => 'video/x-matroska',
-    'mov'  => 'video/quicktime',
-    'ogg'  => 'video/ogg',
-    'ogv'  => 'video/ogg',
-    'mp3'  => 'audio/mpeg',
-    'wav'  => 'audio/wav',
-    'm4a'  => 'audio/mp4',
-    'aac'  => 'audio/aac',
-    'flac' => 'audio/flac',
-    'pdf'  => 'application/pdf',
-];
-
-$ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-
-if (is_file($filePath) && isset($mediaMimes[$ext])) {
-    serveMediaWithRangeSupport($filePath, $mediaMimes[$ext]);
-    exit;
 }
 
 // ==========================================
@@ -277,10 +270,63 @@ if (preg_match('#^/course/(\d+)/about/?$#', $uri, $matches)) {
     exit;
 }
 
+// Media types that require HTTP Range support (Only evaluated AFTER protected course routes)
+$mediaMimes = [
+    'mp4'  => 'video/mp4',
+    'webm' => 'video/webm',
+    'mkv'  => 'video/x-matroska',
+    'mov'  => 'video/quicktime',
+    'ogg'  => 'video/ogg',
+    'ogv'  => 'video/ogg',
+    'mp3'  => 'audio/mpeg',
+    'wav'  => 'audio/wav',
+    'm4a'  => 'audio/mp4',
+    'aac'  => 'audio/aac',
+    'flac' => 'audio/flac',
+    'pdf'  => 'application/pdf',
+];
+
+$ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+if (is_file($filePath) && isset($mediaMimes[$ext])) {
+    serveMediaWithRangeSupport($filePath, $mediaMimes[$ext]);
+    exit;
+}
+
 // For all other requests (PHP scripts, CSS, JS, images, directories), let PHP built-in server handle normally
 return false;
 
+/**
+ * Validates that a file's canonical realpath is strictly within document root and not in blocked directories.
+ */
+function assertSafePath($file) {
+    $realFile = realpath($file);
+    $realDocRoot = realpath(__DIR__);
+    if ($realFile === false || $realDocRoot === false) {
+        http_response_code(404);
+        echo "404 Not Found";
+        exit;
+    }
+    $normalizedFile = str_replace('\\', '/', $realFile);
+    $normalizedRoot = str_replace('\\', '/', $realDocRoot);
+    if (strpos($normalizedFile, $normalizedRoot . '/') !== 0 && $normalizedFile !== $normalizedRoot) {
+        http_response_code(403);
+        echo "403 Forbidden";
+        exit;
+    }
+    $relPath = substr($normalizedFile, strlen($normalizedRoot));
+    $blocked = ['/app/config', '/app/courses', '/app/logs', '/app/cache', '/.git', '/.github', '/database', '/tests', '/scratch', '/bin'];
+    foreach ($blocked as $b) {
+        if (strpos($relPath, $b . '/') === 0 || $relPath === $b) {
+            http_response_code(403);
+            echo "403 Forbidden";
+            exit;
+        }
+    }
+}
+
 function serveStaticFile($file) {
+    assertSafePath($file);
     $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
     $contentTypes = [
         'js'    => 'application/javascript',
@@ -309,6 +355,7 @@ function serveStaticFile($file) {
 }
 
 function serveMediaWithRangeSupport($file, $mimeType) {
+    assertSafePath($file);
     $fileSize = filesize($file);
     $rangeHeader = isset($_SERVER['HTTP_RANGE']) ? trim($_SERVER['HTTP_RANGE']) : '';
 

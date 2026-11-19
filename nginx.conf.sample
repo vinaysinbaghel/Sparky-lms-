@@ -153,6 +153,14 @@ server {
     # 5. STATIC ASSET CACHING & FASTCGI PROCESSING
     # --------------------------------------------------------------------------
     
+    # Video & Audio Streaming with HTTP 206 Partial Content support (Evaluated AFTER course protection)
+    location ~* \.(mp4|webm|mkv|mov|ogg|mp3|wav|m4a|pdf)$ {
+        expires 7d;
+        add_header Cache-Control "public";
+        add_header Accept-Ranges bytes;
+        try_files $uri =404;
+    }
+
     # Static Assets Caching
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         expires 30d;

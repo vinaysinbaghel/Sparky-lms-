@@ -31,7 +31,8 @@ Sparky LMS is a modern, high-performance, open-source Learning Management System
 - [7. Video Streaming & Partial Content (HTTP 206)](#7-video-streaming--partial-content-http-206)
 - [8. Security & Production Hardening](#8-security--production-hardening)
 - [9. Automated Verification & Testing](#9-automated-verification--testing)
-- [10. Troubleshooting & FAQ](#10-troubleshooting--faq)
+- [10. Documentation Index](#10-documentation-index)
+- [11. Troubleshooting & FAQ](#11-troubleshooting--faq)
 
 ---
 
@@ -715,8 +716,38 @@ Expected output:
   [PASS] Database contains table definition: `c_curriculum_lesson`
   [PASS] Database contains table definition: `user_magic_token`
 
+--- 9. Router Multi-Pass Traversal & Canonical Path Security ---
+  [PASS] Multi-pass decode detects double-encoded traversal (%252e%252e)
+  [PASS] Multi-pass decode detects triple-encoded traversal (%25252e%25252e)
+  [PASS] Null byte \0 detected in URI
+  [PASS] URL-encoded null byte %00 decodes to \0
+  [PASS] router.php course rewrites are defined BEFORE generic media streaming
+  [PASS] router.php implements assertSafePath() function
+
+--- 10. Redis Session Architecture & Eviction Protection ---
+  [PASS] configuration.php.dist isolates sessions to redis_session_db (database 0)
+  [PASS] configuration.php.dist isolates cache to redis_cache_db (database 1)
+  [PASS] configuration.php.dist uses dedicated session prefix sparky_sess:
+  [PASS] docker-compose.yml configures --maxmemory-policy noeviction
+  [PASS] docker-compose.yml configures Redis RDB snapshots (--save 900 1)
+  [PASS] docker-compose.yml configures Redis Append-Only File (--appendonly yes)
+
+--- 11. Cryptographic Entropy & Magic Login Security ---
+  [PASS] random_bytes(32) produces 64-char hexadecimal string (256 bits entropy)
+  [PASS] 1,000 generated tokens exhibit zero collisions (collision-resistant)
+  [PASS] MagicLoginManager uses cryptographically secure random_bytes
+
+--- 12. Course Curriculum RBAC & Authorization Checks ---
+  [PASS] curriculum.ajax.php rejects unauthenticated requests with HTTP 401
+  [PASS] curriculum.ajax.php validates write permissions via canEdit check
+  [PASS] curriculum.ajax.php rejects unauthorized writes with HTTP 403
+
+--- 13. Certificate Template Upload & XSS Hardening ---
+  [PASS] certificate_editor.php restricts uploads to safe image types (jpg, jpeg, png, webp, gif)
+  [PASS] certificate_editor.php generates cryptographically randomized background filenames
+
 ========================================================
-PASSED:   101
+PASSED:   121
 FAILED:   0
 WARNINGS: 0
 ========================================================
@@ -725,7 +756,18 @@ ALL TESTS PASSED SUCCESSFULLY.
 
 ---
 
-## 10. Troubleshooting & FAQ
+## 10. Documentation Index
+
+Comprehensive engineering and security documentation is available in the [`documentation/`](documentation/) directory:
+
+- 📘 [Engineering Audit & Architecture Inventory](documentation/ENGINEERING_AUDIT.md) — Comprehensive breakdown of core Chamilo foundation vs. custom Sparky subsystems.
+- 🛡️ [Security Audit & Vulnerability Remediation](documentation/SECURITY_AUDIT.md) — Analysis of threats, remediation implementations, and secret scanning resolution.
+- 🚀 [Production & Local Deployment Guide](documentation/DEPLOYMENT_GUIDE.md) — Verified setup instructions for Docker Compose, Ubuntu/Debian Linux, and local Windows development.
+- 🧪 [Automated Verification & Test Report](documentation/TEST_REPORT.md) — Detailed results of the 121-assertion automated verification suite across all 13 categories.
+
+---
+
+## 11. Troubleshooting & FAQ
 
 #### Q: "Database is unavailable" error on first launch
 - **Cause:** MariaDB service is stopped or database credentials do not match.

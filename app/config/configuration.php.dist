@@ -31,8 +31,24 @@ $_configuration['password_encryption'] = 'bcrypt';
 
 // 4. Redis Caching & Session Store
 $_configuration['redis_host']     = getenv('REDIS_HOST') ?: '127.0.0.1';
-$_configuration['redis_port']     = getenv('REDIS_PORT') ?: 6379;
+$_configuration['redis_port']     = (int)(getenv('REDIS_PORT') ?: 6379);
 $_configuration['redis_password'] = getenv('REDIS_PASSWORD') ?: null;
+$_configuration['redis_session_db'] = (int)(getenv('REDIS_SESSION_DB') ?: 0);
+$_configuration['redis_cache_db']   = (int)(getenv('REDIS_CACHE_DB') ?: 1);
+
+// Configure Redis session handler if phpredis extension is loaded and session is not already active
+if (extension_loaded('redis') && !empty($_configuration['redis_host']) && session_status() === PHP_SESSION_NONE) {
+    $redisAuth = !empty($_configuration['redis_password']) ? 'auth=' . rawurlencode($_configuration['redis_password']) . '&' : '';
+    $savePath = sprintf(
+        'tcp://%s:%d?%sdatabase=%d&prefix=sparky_sess:&timeout=2.0',
+        $_configuration['redis_host'],
+        $_configuration['redis_port'],
+        $redisAuth,
+        $_configuration['redis_session_db']
+    );
+    @ini_set('session.save_handler', 'redis');
+    @ini_set('session.save_path', $savePath);
+}
 
 // 5. System Administration & Platform Defaults
 $_configuration['software_name'] = 'Sparky LMS';

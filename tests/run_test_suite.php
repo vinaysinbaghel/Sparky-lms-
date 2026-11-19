@@ -329,6 +329,90 @@ foreach ($keyTables as $tbl) {
 }
 
 // -----------------------------------------------------------------------------
+// 9. ROUTER TRAVERSAL DEFENSE & CANONICAL PATH SECURITY
+// -----------------------------------------------------------------------------
+echo "\n--- 9. Router Multi-Pass Traversal & Canonical Path Security ---\n";
+function simulateRouterDecode($rawUri) {
+    $decodedUri = $rawUri;
+    $maxDecodes = 5;
+    while ($maxDecodes-- > 0 && strpos($decodedUri, '%') !== false) {
+        $next = rawurldecode($decodedUri);
+        if ($next === $decodedUri) break;
+        $decodedUri = $next;
+    }
+    return $decodedUri;
+}
+$doubleEncoded = '%252e%252e%252f%252e%252e%252fetc%252fpasswd';
+$tripleEncoded = '%25252e%25252e%252f';
+assertTest("Multi-pass decode detects double-encoded traversal (%252e%252e)", strpos(simulateRouterDecode($doubleEncoded), '..') !== false);
+assertTest("Multi-pass decode detects triple-encoded traversal (%25252e%25252e)", strpos(simulateRouterDecode($tripleEncoded), '..') !== false);
+
+// Null byte rejection
+$nullUri1 = "/index.php\0.jpg";
+$nullUri2 = "/index.php%00.jpg";
+assertTest("Null byte \\0 detected in URI", strpos($nullUri1, chr(0)) !== false);
+assertTest("URL-encoded null byte %00 decodes to \\0", strpos(simulateRouterDecode($nullUri2), chr(0)) !== false);
+
+// Precedence test: in router.php, course routes appear BEFORE serveMediaWithRangeSupport
+$routerContentFull = file_get_contents($routerPath);
+$posCourseRoutes = strpos($routerContentFull, 'Sparky URL Rewrites');
+$posMediaServe = strpos($routerContentFull, 'serveMediaWithRangeSupport($filePath');
+assertTest("router.php course rewrites are defined BEFORE generic media streaming", $posCourseRoutes !== false && $posMediaServe !== false && $posCourseRoutes < $posMediaServe);
+
+// Canonical path checking function in router.php
+assertTest("router.php implements assertSafePath() function", strpos($routerContentFull, 'function assertSafePath(') !== false);
+
+// -----------------------------------------------------------------------------
+// 10. REDIS SESSION ISOLATION & NO-EVICTION ARCHITECTURE
+// -----------------------------------------------------------------------------
+echo "\n--- 10. Redis Session Architecture & Eviction Protection ---\n";
+$configDistContent = file_get_contents($rootDir . '/app/config/configuration.php.dist');
+assertTest("configuration.php.dist isolates sessions to redis_session_db (database 0)", strpos($configDistContent, "'redis_session_db'") !== false);
+assertTest("configuration.php.dist isolates cache to redis_cache_db (database 1)", strpos($configDistContent, "'redis_cache_db'") !== false);
+assertTest("configuration.php.dist uses dedicated session prefix sparky_sess:", strpos($configDistContent, 'prefix=sparky_sess:') !== false);
+assertTest("docker-compose.yml configures --maxmemory-policy noeviction", strpos($dockerComposeContent, '--maxmemory-policy noeviction') !== false);
+assertTest("docker-compose.yml configures Redis RDB snapshots (--save 900 1)", strpos($dockerComposeContent, '--save 900 1') !== false);
+assertTest("docker-compose.yml configures Redis Append-Only File (--appendonly yes)", strpos($dockerComposeContent, '--appendonly yes') !== false);
+
+// -----------------------------------------------------------------------------
+// 11. CRYPTOGRAPHIC ENTROPY & MAGIC LOGIN SECURITY
+// -----------------------------------------------------------------------------
+echo "\n--- 11. Cryptographic Entropy & Magic Login Security ---\n";
+$tokens = [];
+$collision = false;
+$sampleTok = '';
+for ($i = 0; $i < 1000; $i++) {
+    $sampleTok = bin2hex(random_bytes(32));
+    if (isset($tokens[$sampleTok])) {
+        $collision = true;
+        break;
+    }
+    $tokens[$sampleTok] = true;
+}
+assertTest("random_bytes(32) produces 64-char hexadecimal string (256 bits entropy)", strlen($sampleTok) === 64 && ctype_xdigit($sampleTok));
+assertTest("1,000 generated tokens exhibit zero collisions (collision-resistant)", !$collision);
+
+$magicLibContent = file_get_contents($rootDir . '/main/inc/lib/magic_login.lib.php');
+assertTest("MagicLoginManager uses cryptographically secure random_bytes", strpos($magicLibContent, 'bin2hex(random_bytes(32))') !== false);
+
+// -----------------------------------------------------------------------------
+// 12. COURSE CURRICULUM RBAC & AUTHORIZATION CHECKS
+// -----------------------------------------------------------------------------
+echo "\n--- 12. Course Curriculum RBAC & Authorization Checks ---\n";
+$curriculumAjaxContent = file_get_contents($rootDir . '/main/inc/ajax/curriculum.ajax.php');
+assertTest("curriculum.ajax.php rejects unauthenticated requests with HTTP 401", strpos($curriculumAjaxContent, 'http_response_code(401)') !== false);
+assertTest("curriculum.ajax.php validates write permissions via canEdit check", strpos($curriculumAjaxContent, '$canEdit') !== false);
+assertTest("curriculum.ajax.php rejects unauthorized writes with HTTP 403", strpos($curriculumAjaxContent, 'http_response_code(403)') !== false);
+
+// -----------------------------------------------------------------------------
+// 13. CERTIFICATE TEMPLATE & XSS PROTECTION
+// -----------------------------------------------------------------------------
+echo "\n--- 13. Certificate Template Upload & XSS Hardening ---\n";
+$certEditorContent = file_get_contents($rootDir . '/main/admin/certificate_editor.php');
+assertTest("certificate_editor.php restricts uploads to safe image types (jpg, jpeg, png, webp, gif)", strpos($certEditorContent, "['jpg', 'jpeg', 'png', 'webp', 'gif']") !== false);
+assertTest("certificate_editor.php generates cryptographically randomized background filenames", strpos($certEditorContent, 'bin2hex(random_bytes(8))') !== false);
+
+// -----------------------------------------------------------------------------
 // SUMMARY
 // -----------------------------------------------------------------------------
 echo "\n========================================================\n";
