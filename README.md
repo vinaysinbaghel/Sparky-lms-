@@ -183,20 +183,22 @@ Install the Redis server:
 sudo apt install -y redis-server
 ```
 
-Edit `/etc/redis/redis.conf` to optimize for session management:
+Edit `/etc/redis/redis.conf` to configure safe, dedicated session persistence:
 ```conf
 supervised systemd
+requirepass Strong_Secure_Redis_Password_Here!
 maxmemory 512mb
-maxmemory-policy allkeys-lru
-save ""
-appendonly no
+maxmemory-policy noeviction
+save 900 1
+save 300 10
+appendonly yes
 ```
 
 Restart and verify Redis:
 ```bash
 sudo systemctl restart redis-server
 sudo systemctl enable redis-server
-redis-cli ping
+redis-cli -a Strong_Secure_Redis_Password_Here! ping
 # Output: PONG
 ```
 
@@ -204,15 +206,18 @@ redis-cli ping
 
 ### Step 4: Clone & Configure Sparky LMS
 
-Deploy the repository to `/var/www/sparky`:
+Deploy the repository to `/var/www/sparky-lms`:
 ```bash
-sudo mkdir -p /var/www/sparky
-sudo git clone https://github.com/your-org/sparky.git /var/www/sparky
+sudo mkdir -p /var/www/sparky-lms
+sudo git clone https://github.com/vinaysinbaghel/Sparky-lms-.git /var/www/sparky-lms
+cd /var/www/sparky-lms
 ```
 
-Navigate to the application directory (e.g., `/var/www/sparky/sparky-1.0`):
+Copy the production configuration template:
 ```bash
-cd /var/www/sparky/sparky-1.0
+cp app/config/configuration.php.dist app/config/configuration.php
+chmod 640 app/config/configuration.php
+sudo chown www-data:www-data app/config/configuration.php
 ```
 
 Set up environment variables in `/etc/environment` or via a `.env` loader:
@@ -226,6 +231,7 @@ DB_PASSWORD="Strong_Secure_Password_Here!"
 APP_HOST="learn.yourdomain.com"
 REDIS_HOST="127.0.0.1"
 REDIS_PORT="6379"
+REDIS_PASSWORD="Strong_Secure_Redis_Password_Here!"
 EOF'
 ```
 
@@ -236,10 +242,10 @@ EOF'
 Ensure the web server user (`www-data`) owns and can write to the application cache, upload, home, and course repositories:
 
 ```bash
-cd /var/www/sparky/sparky-1.0
-sudo chown -R www-data:www-data /var/www/sparky
-sudo find /var/www/sparky/sparky-1.0 -type f -exec chmod 644 {} +
-sudo find /var/www/sparky/sparky-1.0 -type d -exec chmod 755 {} +
+cd /var/www/sparky-lms
+sudo chown -R www-data:www-data /var/www/sparky-lms
+sudo find /var/www/sparky-lms -type f -exec chmod 644 {} +
+sudo find /var/www/sparky-lms -type d -exec chmod 755 {} +
 
 # Writable directories for uploads, cache, and user files
 sudo chmod -R 775 app/cache app/upload app/home courses
@@ -254,16 +260,16 @@ Install Nginx:
 sudo apt install -y nginx
 ```
 
-Create `/etc/nginx/sites-available/sparky.conf`:
+Create `/etc/nginx/sites-available/sparky-lms.conf`:
 
 ```nginx
 server {
     listen 80;
     server_name learn.yourdomain.com;
-    root /var/www/sparky/sparky-1.0;
+    root /var/www/sparky-lms;
     index index.php index.html;
 
-    client_max_body_size 500M;
+    client_max_body_size 512M;
     client_body_buffer_size 128k;
 
     access_log /var/log/nginx/sparky_access.log combined buffer=64k flush=5m;
@@ -276,14 +282,20 @@ server {
     gzip_comp_level 6;
     gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
 
-    # Security: Block sensitive directories & internal scripts
-    location ~* ^/(app/config|scratch|\.git|\.env|vendor|tests) {
+    # Security: Block sensitive directories & internal files
+    location ~ ^/(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache|app/courses) {
+        deny all;
+        return 403;
+    }
+
+    # Security: Block database backups, scripts, configs, lockfiles
+    location ~* \.(sql|bat|sh|yml|yaml|dist|lock|log|env|ini|md)$ {
         deny all;
         return 403;
     }
 
     # Security: Prevent execution of PHP in writable upload directories
-    location ~* ^/(app/upload|app/cache|app/home|courses)/.*\.php$ {
+    location ~* ^/app/(upload|courses|cache|logs)/.*\.php$ {
         deny all;
         return 403;
     }
@@ -300,9 +312,12 @@ server {
         expires 7d;
         add_header Cache-Control "public";
         add_header Accept-Ranges bytes;
-        proxy_set_header Range $http_range;
-        proxy_set_header If-Range $http_if_range;
         try_files $uri =404;
+    }
+
+    # Certificate Verification Route
+    location ~ ^/certificates/?$ {
+        rewrite ^/certificates/?$ /certificates/index.php last;
     }
 
     # Course Virtual Route Rewriting
@@ -310,9 +325,9 @@ server {
         rewrite ^/courses/([^/]+)/?$ /main/course_home/course_home.php?cDir=$1 last;
     }
 
-    # Certificate Verification Route
-    location ~ ^/certificates/?$ {
-        rewrite ^/certificates/?$ /certificates/index.php last;
+    # Protected Course Downloads (Enforces student enrollment & LMS authentication)
+    location ~* ^/courses/([^/]+)/(.*)$ {
+        rewrite ^/courses/([^/]+)/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
     }
 
     # Core Application Gateway
@@ -340,7 +355,7 @@ server {
 
 Enable the configuration and test Nginx:
 ```bash
-sudo ln -s /etc/nginx/sites-available/sparky.conf /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/sparky-lms.conf /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -349,12 +364,12 @@ sudo systemctl reload nginx
 
 ### Step 7: Configure Redis Session Handler in PHP-FPM
 
-To handle high student concurrency, route PHP sessions directly to Redis.
+To handle high student concurrency safely, route PHP sessions directly to Redis with authentication:
 
 Edit `/etc/php/8.3/fpm/pool.d/www.conf`:
 ```ini
 php_value[session.save_handler] = redis
-php_value[session.save_path] = "tcp://127.0.0.1:6379?prefix=sparky_sess:&timeout=2.0"
+php_value[session.save_path] = "tcp://127.0.0.1:6379?auth=Strong_Secure_Redis_Password_Here!&prefix=sparky_sess:&timeout=2.0"
 ```
 
 Restart PHP-FPM:
@@ -362,7 +377,7 @@ Restart PHP-FPM:
 sudo systemctl restart php8.3-fpm
 ```
 
-Now, all active student and admin sessions will be managed in Redis with microsecond access times.
+Now, all active student and admin sessions will be managed in Redis with microsecond access times and persist without eviction.
 
 ---
 
@@ -374,10 +389,10 @@ Add the following to the `www-data` user's crontab (`sudo crontab -u www-data -e
 
 ```cron
 # Process platform agenda notifications every hour
-0 * * * * php /var/www/sparky/sparky-1.0/main/cron/agenda.php > /dev/null 2>&1
+0 * * * * php /var/www/sparky-lms/main/cron/agenda.php > /dev/null 2>&1
 
 # Run daily maintenance and archive tasks at 02:00 AM
-0 2 * * * php /var/www/sparky/sparky-1.0/main/cron/cleanup.php > /dev/null 2>&1
+0 2 * * * php /var/www/sparky-lms/main/cron/cleanup.php > /dev/null 2>&1
 ```
 
 ---
@@ -397,30 +412,35 @@ Certbot will configure TLS 1.3 encryption and automatic certificate renewals.
 
 ## 4. Docker & Docker Compose Deployment
 
-For containerized environments (AWS ECS, Google Cloud Run, DigitalOcean, self-hosted Docker), a turnkey `docker-compose.yml` is provided:
+For containerized environments (AWS ECS, Google Cloud Run, DigitalOcean, self-hosted Docker), a turnkey `docker-compose.yml` and `Dockerfile` are provided in the repository root:
 
 ```yaml
 version: '3.8'
 
 services:
   app:
-    image: php:8.3-fpm-alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: sparky_app
     restart: unless-stopped
     volumes:
-      - ./sparky-1.0:/var/www/html
+      - .:/var/www/sparky-lms
     environment:
       DB_HOST: db
       DB_PORT: 3306
       DB_NAME: sparky_lms
       DB_USER: sparky_user
-      DB_PASSWORD: ${DB_PASSWORD:-SecretPassword123}
+      DB_PASSWORD: ${DB_PASSWORD:-SparkySecurePass2026!}
       APP_HOST: ${APP_HOST:-localhost}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-SparkyRedisPass2026!}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   web:
     image: nginx:alpine
@@ -430,8 +450,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./sparky-1.0:/var/www/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - .:/var/www/sparky-lms:ro
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - app
 
@@ -440,27 +460,45 @@ services:
     container_name: sparky_db
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootSecret456}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootSecurePass2026!}
       MYSQL_DATABASE: sparky_lms
       MYSQL_USER: sparky_user
-      MYSQL_PASSWORD: ${DB_PASSWORD:-SecretPassword123}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-SparkySecurePass2026!}
     volumes:
       - mariadb_data:/var/lib/mysql
+      - ./database/sparky_clean_database.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: sparky_redis
     restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-SparkyRedisPass2026!}
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+      --save 900 1
+      --save 300 10
+      --appendonly yes
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-SparkyRedisPass2026!}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mariadb_data:
   redis_data:
 ```
 
-Launch the cluster:
+Launch the cluster from repository root:
 ```bash
 docker compose up -d
 ```
@@ -475,9 +513,8 @@ docker compose up -d
 3. The script automatically launches MariaDB and starts the development server at `http://localhost:8000`.
 
 ### Linux / macOS Quickstart
-Run the built-in development router with media streaming support:
+Run the built-in development router with media streaming support from repository root:
 ```bash
-cd sparky-1.0
 php -S localhost:8000 router.php
 ```
 
@@ -487,14 +524,14 @@ Visit `http://localhost:8000` in your web browser.
 
 ## 6. Configuration & Environment Variables
 
-All core infrastructure variables are dynamically resolved in `app/config/configuration.php`. You can override them using environment variables:
+All core infrastructure variables are dynamically resolved in `app/config/configuration.php` (created from `app/config/configuration.php.dist`). You can configure them directly or set environment variables:
 
 | Environment Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| `DB_HOST` | `localhost` | MariaDB / MySQL host IP or hostname |
+| `DB_HOST` | `127.0.0.1` | MariaDB / MySQL host IP or hostname |
 | `DB_PORT` | `3306` | Database port |
-| `DB_NAME` | `chamilo` / `sparky_lms` | Main database name |
-| `DB_USER` | `root` | Database username |
+| `DB_NAME` | `sparky_lms` | Main database name |
+| `DB_USER` | `sparky_user` | Database username |
 | `DB_PASSWORD` | `""` | Database password |
 | `APP_HOST` | `localhost:8000` | Host domain name for URL generation |
 | `REDIS_HOST` | `127.0.0.1` | Redis server hostname |
@@ -521,17 +558,18 @@ HTML5 video players require standard HTTP 206 Partial Content (Byte-Range) respo
    Content-Length: 1048576
    Content-Type: video/mp4
    ```
-3. Nginx and the development `router.php` both support this protocol natively out of the box.
+3. Nginx and the development `router.php` both support this protocol natively out of the box while enforcing student authorization.
 
 ---
 
 ## 8. Security & Production Hardening
 
-- **Direct Web Access Blocks:** Direct requests to `/app/config/`, `/.git`, `/scratch/`, and `/.env` return HTTP 403 Forbidden.
-- **Upload Execution Protection:** Script execution (`.php`, `.phtml`, `.phar`) inside writable directories (`app/upload/`, `courses/`, `app/cache/`) is blocked at the web server level.
+- **Direct Web Access Blocks:** Direct requests to `/database/`, `/app/config/`, `/app/courses/`, `/.git`, and `/.env` return HTTP 403 Forbidden.
+- **Course Authorization Enforcement:** All private course materials (videos, documents, assignments) route through LMS authentication handlers (`download.php`, `download_scorm.php`) requiring active student enrollment.
+- **Upload Execution Protection:** Script execution (`.php`, `.phtml`, `.phar`) inside writable directories (`app/upload/`, `courses/`, `app/cache/`) is blocked at both web server and application levels.
 - **XSS & SQL Injection Defense:** All user inputs pass through sanitized database abstractions (`Database::escape_string()`, PDO parameter binding, and `Security::remove_XSS()`).
-- **CSRF Token Verification:** Sensitive POST submissions (user creation, certificate blueprint deletion) enforce session token validation.
-- **Reverse Proxy / Cloudflare Support:** Built-in protocol detection handles `HTTP_X_FORWARDED_PROTO`, `HTTP_X_FORWARDED_SSL`, and `HTTP_CF_VISITOR` for transparent HTTPS termination.
+- **Session Security:** Runtime enforcement of `session.cookie_httponly = 1`, `session.cookie_secure = 1`, `session.use_only_cookies = 1`, and `session.use_strict_mode = 1`.
+- **CORS Boundary Protection:** Eliminates wildcard CORS on protected course media; restricts playback to same-origin or configured host.
 
 ---
 
@@ -541,7 +579,7 @@ Sparky LMS includes an automated test runner validating database schemas, endpoi
 
 Run the test suite:
 ```bash
-php sparky-1.0/scratch/run_test_suite.php
+php tests/run_test_suite.php
 ```
 
 Expected output:
@@ -549,20 +587,77 @@ Expected output:
 ========================================================
         SPARKY LMS - COMPREHENSIVE TEST SUITE           
 ========================================================
---- 1. Testing Database Schema & Required Tables ---
-  [PASS] Table exists: course
-  [PASS] Table exists: user
-  [PASS] Table exists: session
-  [PASS] Table exists: c_certificate_blueprint
-  [PASS] Table exists: c_curriculum_chapter
-  [PASS] Table exists: c_curriculum_lesson
---- 3. Testing Guest HTTP Endpoints ---
-  [PASS] GET / (Homepage) - HTTP 200 OK
---- 4. Testing Guest Security Access Control ---
-  [PASS] Guest access restricted: /main/admin/index.php - Access blocked
---- 10. Testing HTTP 206 Partial Content Range Streaming ---
-  [PASS] HTTP 206 Partial Content - Range: bytes=0-1023
-  [PASS] Accept-Ranges Header - Accept-Ranges: bytes header present
+--- 1. PHP Runtime & Dependency Contract ---
+  [PASS] PHP Version >= 8.1
+  [PASS] Extension: cURL loaded
+  [PASS] Extension: FileInfo loaded
+  [PASS] Extension: GD loaded
+  [PASS] Extension: Intl loaded
+  [PASS] Extension: JSON loaded
+  [PASS] Extension: Multibyte String (mbstring) loaded
+  [PASS] Extension: XML loaded
+  [PASS] Extension: Zip loaded
+
+--- 2. Composer & Deployment Contract ---
+  [PASS] composer.json exists
+  [PASS] composer.json is valid JSON
+  [PASS] composer.json declares PHP 8.1+ contract
+  [PASS] composer.json has security audit blocking enabled
+  [PASS] app/config/configuration.php.dist exists
+  [PASS] docker-compose.yml exists
+  [PASS] Dockerfile exists
+  [PASS] docker/nginx.conf exists
+  [PASS] nginx.conf.sample exists
+
+--- 3. Web Server Access Controls & Negative Security Tests ---
+  [PASS] .htaccess blocks direct access to database/ directory
+  [PASS] .htaccess blocks .sql dump files
+  [PASS] database/.htaccess denies all access
+  [PASS] router.php blocks /database directory
+  [PASS] router.php blocks /app/config directory
+  [PASS] router.php blocks direct /app/courses directory access
+  [PASS] router.php avoids wildcard CORS on media
+
+--- 4. Curriculum Upload & RCE Prevention Tests ---
+  [PASS] Curriculum upload strictly rejects .php files
+  [PASS] Curriculum upload strictly rejects .phar archives
+  [PASS] Curriculum upload strictly rejects .sh shell scripts
+  [PASS] Curriculum upload strictly rejects .exe executables
+
+--- 5. Certificate Blueprints & XSS Sanitization Tests ---
+  [PASS] Certificate rendering escapes XSS script tag in student name
+  [PASS] Certificate Editor background upload disallows SVG to prevent Stored XSS
+
+--- 6. HTTP 206 Partial Content Range Parsing Tests ---
+  [PASS] Range bytes=0-1023 parses start 0, end 1023, length 1024
+  [PASS] Open range bytes=500000- parses start 500000, end 999999
+  [PASS] Suffix range bytes=-500 parses start 999500, end 999999
+  [PASS] Out-of-bounds range returns HTTP 416 Range Not Satisfiable
+
+--- 7. Runtime Session Security Contract ---
+  [PASS] chamilo_session enforces session.cookie_httponly = 1
+  [PASS] chamilo_session enforces session.use_only_cookies = 1
+  [PASS] chamilo_session enforces session.use_strict_mode = 1
+
+--- 8. Database Schema & Bootstrap Verification ---
+  [PASS] Clean database dump exists (database/sparky_clean_database.sql)
+  [PASS] Database dump has valid MariaDB / MySQL dump header
+  [PASS] Database contains table definition: `user`
+  [PASS] Database contains table definition: `course`
+  [PASS] Database contains table definition: `session`
+  [PASS] Database contains table definition: `c_document`
+  [PASS] Database contains table definition: `c_item_property`
+  [PASS] Database contains table definition: `c_certificate_blueprint`
+  [PASS] Database contains table definition: `c_curriculum_chapter`
+  [PASS] Database contains table definition: `c_curriculum_lesson`
+  [PASS] Database contains table definition: `user_magic_token`
+
+========================================================
+PASSED:   65
+FAILED:   0
+WARNINGS: 0
+========================================================
+ALL TESTS PASSED SUCCESSFULLY.
 
 ========================================================
 PASSED:   59

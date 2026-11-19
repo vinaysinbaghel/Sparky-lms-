@@ -1,0 +1,33 @@
+name: Sparky LMS Verification Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify:
+    name: Test & Security Audit (PHP ${{ matrix.php-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.1', '8.2', '8.3']
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: curl, fileinfo, gd, intl, json, mbstring, xml, zip, pdo_mysql, mysqli, redis
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Run Sparky Automated Verification Suite
+        run: php tests/run_test_suite.php

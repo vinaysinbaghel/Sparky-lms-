@@ -1,0 +1,48 @@
+<?php
+/**
+ * Sparky LMS Production Configuration Template
+ * Copy this file to app/config/configuration.php and adjust values or set environment variables.
+ */
+
+// 1. Database Connection Settings (supports environment variables)
+$_configuration['db_host']     = getenv('DB_HOST') ?: '127.0.0.1';
+$_configuration['db_port']     = getenv('DB_PORT') ?: '3306';
+$_configuration['main_database'] = getenv('DB_NAME') ?: 'sparky_lms';
+$_configuration['db_user']     = getenv('DB_USER') ?: 'sparky_user';
+$_configuration['db_password'] = getenv('DB_PASSWORD') ?: '';
+
+// 2. Directory & Host Paths
+$sysRoot = rtrim(str_replace('\\', '/', realpath(__DIR__ . '/../../')), '/') . '/';
+$_configuration['root_sys'] = $sysRoot;
+
+$appHost = getenv('APP_HOST') ?: (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost:8000');
+$isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+    || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+    || (isset($_SERVER['HTTP_CF_VISITOR']) && strpos($_SERVER['HTTP_CF_VISITOR'], 'https') !== false);
+$scheme = $isHttps ? 'https://' : 'http://';
+
+$_configuration['root_web']   = $scheme . rtrim($appHost, '/') . '/';
+$_configuration['url_append'] = '';
+
+// 3. Security & Hashing Keys
+// Generate a 32-character random string for production: bin2hex(random_bytes(16))
+$_configuration['security_key'] = getenv('SECURITY_KEY') ?: 'sparky_prod_sec_key_ChangeThisInProduction!';
+$_configuration['password_encryption'] = 'bcrypt';
+
+// 4. Redis Caching & Session Store
+$_configuration['redis_host']     = getenv('REDIS_HOST') ?: '127.0.0.1';
+$_configuration['redis_port']     = getenv('REDIS_PORT') ?: 6379;
+$_configuration['redis_password'] = getenv('REDIS_PASSWORD') ?: null;
+
+// 5. System Administration & Platform Defaults
+$_configuration['software_name'] = 'Sparky LMS';
+$_configuration['system_version'] = '1.0';
+$_configuration['institution']   = 'Sparky Learning Platform';
+$_configuration['institution_url'] = $_configuration['root_web'];
+$_configuration['admin_email']   = getenv('ADMIN_EMAIL') ?: 'admin@sparkylms.com';
+$_configuration['admin_name']    = 'Sparky Administrator';
+
+// 6. Security & Session Policy
+$_configuration['session_lifetime'] = 86400; // 24 hours
+$_configuration['security_session_cookie_samesite_none'] = false;
+$_configuration['deny_delete_users'] = false;

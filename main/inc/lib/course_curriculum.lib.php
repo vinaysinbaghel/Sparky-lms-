@@ -133,24 +133,13 @@ public static function formatVideoEmbedUrl($url)
             return false;
         }
 
-        $courseInfo = api_get_course_info($courseCode);
-        $cRealId = !empty($courseInfo['real_id']) ? (int)$courseInfo['real_id'] : 0;
-        if ($cRealId === 0) {
-            $courseTable = Database::get_main_table(TABLE_MAIN_COURSE);
-            $cRes = Database::query("SELECT id FROM $courseTable WHERE code = '" . Database::escape_string($courseCode) . "' LIMIT 1");
-            if ($cRow = Database::fetch_assoc($cRes)) {
-                $cRealId = (int)$cRow['id'];
-            }
-        }
-        $currentUserId = api_get_user_id();
-        if ($currentUserId <= 0) {
-            $currentUserId = 1;
+        // Sanitize course code to prevent path traversal
+        $courseCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $courseCode);
+        if (empty($courseCode)) {
+            return false;
         }
 
         $origName = $fileArray['name'];
-        $fileSize = (int)$fileArray['size'];
-        $mimeType = !empty($fileArray['type']) ? $fileArray['type'] : mime_content_type($fileArray['tmp_name']);
-        $detectedType = self::detectLessonTypeFromFilename($origName);
 
         // Security: Whitelist allowed file extensions for curriculum materials
         $allowedExts = [
@@ -163,12 +152,6 @@ public static function formatVideoEmbedUrl($url)
             // Archives & Images
             'zip', 'rar', '7z', 'jpg', 'jpeg', 'png', 'webp', 'gif'
         ];
-
-        // Sanitize course code to prevent path traversal
-        $courseCode = preg_replace('/[^a-zA-Z0-9_-]/', '', $courseCode);
-        if (empty($courseCode)) {
-            return false;
-        }
 
         // Sanitize filename & validate extension
         $fileInfo = pathinfo($origName);
@@ -183,17 +166,36 @@ public static function formatVideoEmbedUrl($url)
             return false;
         }
 
+        $courseInfo = function_exists('api_get_course_info') ? api_get_course_info($courseCode) : [];
+        $cRealId = !empty($courseInfo['real_id']) ? (int)$courseInfo['real_id'] : 0;
+        if ($cRealId === 0 && class_exists('Database')) {
+            $courseTable = Database::get_main_table(TABLE_MAIN_COURSE);
+            $cRes = Database::query("SELECT id FROM $courseTable WHERE code = '" . Database::escape_string($courseCode) . "' LIMIT 1");
+            if ($cRow = Database::fetch_assoc($cRes)) {
+                $cRealId = (int)$cRow['id'];
+            }
+        }
+        $currentUserId = function_exists('api_get_user_id') ? api_get_user_id() : 1;
+        if ($currentUserId <= 0) {
+            $currentUserId = 1;
+        }
+
+        $fileSize = (int)$fileArray['size'];
+        $mimeType = !empty($fileArray['type']) ? $fileArray['type'] : (function_exists('mime_content_type') && file_exists($fileArray['tmp_name']) ? mime_content_type($fileArray['tmp_name']) : 'application/octet-stream');
+        $detectedType = self::detectLessonTypeFromFilename($origName);
+
         $cleanBase = preg_replace('/[^a-zA-Z0-9_-]/', '_', $fileInfo['filename']);
         $savedFileName = $cleanBase . '_' . time() . '_' . substr(md5(uniqid()), 0, 8) . '.' . $ext;
 
         // Ensure physical upload directory exists
-        $uploadSysDir = api_get_path(SYS_APP_PATH) . 'upload/curriculum/' . $courseCode . '/';
+        $sysAppPath = function_exists('api_get_path') ? api_get_path(SYS_APP_PATH) : (dirname(__DIR__, 3) . '/app/');
+        $uploadSysDir = $sysAppPath . 'upload/curriculum/' . $courseCode . '/';
         if (!is_dir($uploadSysDir)) {
             @mkdir($uploadSysDir, 0755, true);
         }
 
         // Protect curriculum upload directory from script execution and directory browsing
-        $curriculumBaseDir = api_get_path(SYS_APP_PATH) . 'upload/curriculum/';
+        $curriculumBaseDir = $sysAppPath . 'upload/curriculum/';
         if (!file_exists($curriculumBaseDir . '.htaccess')) {
             $htContent = "<IfModule mod_authz_core.c>\n    <FilesMatch \"\\.(ph(p[34578]?|t|tml|ar)|cgi|pl|py|sh|bash|bat|exe|dll)$\">\n        Require all denied\n    </FilesMatch>\n</IfModule>\n<IfModule !mod_authz_core.c>\n    <FilesMatch \"\\.(ph(p[34578]?|t|tml|ar)|cgi|pl|py|sh|bash|bat|exe|dll)$\">\n        Deny from all\n    </FilesMatch>\n</IfModule>\nOptions -Indexes -ExecCGI\n";
             @file_put_contents($curriculumBaseDir . '.htaccess', $htContent);

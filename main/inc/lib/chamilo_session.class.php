@@ -98,12 +98,22 @@ class ChamiloSession extends System\Session
             }
         }
 
-        //Use entropy file
-        //session.entropy_file
-        //ini_set('session.entropy_length', 128);
-        //Do not include the identifier in the URL, and not to read the URL for
-        // identifiers.
+        // Security Hardening: Enforce secure session cookie settings at startup
         ini_set('session.use_trans_sid', 0);
+        ini_set('session.use_only_cookies', 1);
+        ini_set('session.use_strict_mode', 1);
+        ini_set('session.cookie_httponly', 1);
+
+        $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+            || (isset($_SERVER['HTTP_CF_VISITOR']) && strpos($_SERVER['HTTP_CF_VISITOR'], 'https') !== false);
+        if ($isHttps) {
+            ini_set('session.cookie_secure', 1);
+        }
+
+        if (PHP_VERSION_ID >= 70300 && !api_get_configuration_value('security_session_cookie_samesite_none')) {
+            ini_set('session.cookie_samesite', 'Lax');
+        }
 
         session_name(self::NAME);
         session_start();

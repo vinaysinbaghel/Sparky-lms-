@@ -15,7 +15,7 @@ $uriBase = basename($cleanUri);
 
 $blockedPrefixes = [
     '/.git', '/.github', '/database', '/scratch', '/bin', '/tests',
-    '/app/config', '/app/logs', '/app/cache'
+    '/app/config', '/app/logs', '/app/cache', '/app/courses'
 ];
 
 $blockedExtensions = [
@@ -60,9 +60,30 @@ if ($isForbidden) {
     exit;
 }
 
+// Security: Validate CORS Origin (Avoid wildcard * on protected resources)
+function applyCorsHeaders() {
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+    if (!empty($origin)) {
+        $allowedHosts = ['localhost', '127.0.0.1'];
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $allowedHosts[] = strtolower(explode(':', $_SERVER['HTTP_HOST'])[0]);
+        }
+        $appHost = getenv('APP_HOST');
+        if (!empty($appHost)) {
+            $allowedHosts[] = strtolower(explode(':', $appHost)[0]);
+        }
+        $originHost = strtolower(parse_url($origin, PHP_URL_HOST));
+        if (in_array($originHost, $allowedHosts, true)) {
+            header("Access-Control-Allow-Origin: " . $origin);
+            header("Access-Control-Allow-Credentials: true");
+            header("Vary: Origin");
+        }
+    }
+}
+
 // Handle preflight CORS requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header("Access-Control-Allow-Origin: *");
+    applyCorsHeaders();
     header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
     header("Access-Control-Allow-Headers: Range, Content-Type, Authorization, X-Requested-With, Origin, Accept");
     header("Access-Control-Max-Age: 86400");
@@ -227,18 +248,40 @@ if (preg_match('#^/courses/([^/]+)/work/(.*)$#', $uri, $matches)) {
     exit;
 }
 
-// Other static files in /courses/<cDir>/...
+// Course protected files: Route through document download handler to enforce LMS authorization
 if (preg_match('#^/courses/([^/]+)/(.*)$#', $uri, $matches)) {
-    $appFile = $docRoot . '/app/courses/' . $matches[1] . '/' . $matches[2];
-    if (is_file($appFile)) {
-        $fileExt = strtolower(pathinfo($appFile, PATHINFO_EXTENSION));
-        if (isset($mediaMimes[$fileExt])) {
-            serveMediaWithRangeSupport($appFile, $mediaMimes[$fileExt]);
+    $cDir = $matches[1];
+    $relFile = $matches[2];
+
+    // Explicitly allow course home icons
+    if (preg_match('#^upload/course_home_icons/.*\.(?:js|css|png|jpg|jpeg|gif|svg)$#i', $relFile)) {
+        $appFile = $docRoot . '/app/courses/' . $cDir . '/' . $relFile;
+        if (is_file($appFile)) {
+            serveStaticFile($appFile);
             exit;
         }
-        serveStaticFile($appFile);
-        exit;
     }
+
+    // Explicitly allow certificate public verification assets
+    if (preg_match('#^document/certificates/.*\.(?:png|jpg|jpeg|gif|svg|pdf)$#i', $relFile)) {
+        $appFile = $docRoot . '/app/courses/' . $cDir . '/' . $relFile;
+        if (is_file($appFile)) {
+            serveStaticFile($appFile);
+            exit;
+        }
+    }
+
+    // All other course files MUST be protected through download handler
+    $_GET['doc_url'] = '/' . ltrim($relFile, '/');
+    $_GET['cDir'] = $cDir;
+    $_REQUEST['doc_url'] = '/' . ltrim($relFile, '/');
+    $_REQUEST['cDir'] = $cDir;
+    $_SERVER['SCRIPT_NAME'] = '/main/document/download.php';
+    $_SERVER['PHP_SELF'] = '/main/document/download.php';
+    $_SERVER['SCRIPT_FILENAME'] = $docRoot . '/main/document/download.php';
+    chdir($docRoot . '/main/document');
+    require $docRoot . '/main/document/download.php';
+    exit;
 }
 
 // Certificates clean URL: /certificates/?id=123
@@ -311,7 +354,7 @@ function serveMediaWithRangeSupport($file, $mimeType) {
     $rangeHeader = isset($_SERVER['HTTP_RANGE']) ? trim($_SERVER['HTTP_RANGE']) : '';
 
     // Standard CORS and Cache headers
-    header("Access-Control-Allow-Origin: *");
+    applyCorsHeaders();
     header("Access-Control-Allow-Methods: GET, HEAD, OPTIONS");
     header("Access-Control-Allow-Headers: Range, Content-Type, Accept");
     header("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges");
