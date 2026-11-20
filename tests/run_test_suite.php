@@ -93,24 +93,33 @@ $envExampleContent = file_get_contents($rootDir . '/.env.example');
 assertTest(".env.example documents DB_PASSWORD", strpos($envExampleContent, 'DB_PASSWORD') !== false);
 assertTest(".env.example documents MYSQL_ROOT_PASSWORD", strpos($envExampleContent, 'MYSQL_ROOT_PASSWORD') !== false);
 assertTest(".env.example documents REDIS_PASSWORD", strpos($envExampleContent, 'REDIS_PASSWORD') !== false);
+assertTest(".env.example documents SECURITY_KEY", strpos($envExampleContent, 'SECURITY_KEY') !== false);
+assertTest("docker-compose.yml mandates SECURITY_KEY via :? error syntax", strpos($dockerComposeContent, 'SECURITY_KEY: ${SECURITY_KEY:?') !== false);
+
+$configDistContent = file_get_contents($rootDir . '/app/config/configuration.php.dist');
+assertTest("app/config/configuration.php.dist has NO hardcoded fallback security key", strpos($configDistContent, 'sparky_prod_sec_key_ChangeThisInProduction!') === false);
+assertTest("app/config/configuration.php.dist validates SECURITY_KEY length >= 32", strpos($configDistContent, 'strlen(trim($envSecurityKey)) < 32') !== false);
 
 $gitignoreContent = file_get_contents($rootDir . '/.gitignore');
 assertTest(".gitignore ignores .env", strpos($gitignoreContent, ".env\n") !== false || strpos($gitignoreContent, ".env\r\n") !== false);
+assertTest(".gitignore ignores private SSL keys and certs", strpos($gitignoreContent, 'docker/ssl/*.key') !== false && strpos($gitignoreContent, 'docker/ssl/*.pem') !== false);
 
 assertTest("Dockerfile exists", file_exists($rootDir . '/Dockerfile'));
 $dockerfileContent = file_get_contents($rootDir . '/Dockerfile');
 assertTest("Dockerfile copies composer.json and composer.lock", strpos($dockerfileContent, 'COPY composer.json composer.lock') !== false);
 assertTest("Dockerfile runs composer install", strpos($dockerfileContent, 'composer install') !== false);
 assertTest("Dockerfile sets up entrypoint script", strpos($dockerfileContent, 'ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]') !== false);
+assertTest("Dockerfile configures read-only application source code (root:root)", strpos($dockerfileContent, 'chown -R root:root /var/www/sparky-lms') !== false);
+assertTest("Dockerfile restricts write permissions strictly to mutable storage directories", strpos($dockerfileContent, 'chown -R www-data:www-data /var/www/sparky-lms/app/cache') !== false);
 
 assertTest("docker/entrypoint.sh exists", file_exists($rootDir . '/docker/entrypoint.sh'));
 $entrypointContent = file_get_contents($rootDir . '/docker/entrypoint.sh');
 assertTest("docker/entrypoint.sh validates vendor/autoload.php presence", strpos($entrypointContent, 'vendor/autoload.php') !== false);
+assertTest("docker/entrypoint.sh contains NO --ignore-platform-reqs bypass", strpos($entrypointContent, '--ignore-platform-reqs') === false);
+assertTest("docker/entrypoint.sh validates SECURITY_KEY presence and length", strpos($entrypointContent, 'SECURITY_KEY') !== false && strpos($entrypointContent, '-lt 32') !== false);
 
-assertTest("docker/ssl/cert.pem exists", file_exists($rootDir . '/docker/ssl/cert.pem'));
-assertTest("docker/ssl/key.pem exists", file_exists($rootDir . '/docker/ssl/key.pem'));
-assertTest("docker/ssl/cert.pem is non-empty", filesize($rootDir . '/docker/ssl/cert.pem') > 500);
-assertTest("docker/ssl/key.pem is non-empty", filesize($rootDir . '/docker/ssl/key.pem') > 500);
+assertTest("docker/ssl/generate-certs.sh exists for local certificate generation", file_exists($rootDir . '/docker/ssl/generate-certs.sh'));
+assertTest("docker/ssl/README.md documents secure certificate generation and rotation", file_exists($rootDir . '/docker/ssl/README.md'));
 
 assertTest("docker/nginx.conf exists", file_exists($rootDir . '/docker/nginx.conf'));
 $dockerNginxContent = file_get_contents($rootDir . '/docker/nginx.conf');
@@ -129,12 +138,16 @@ assertTest("docker/sparky-routes.inc exists", file_exists($rootDir . '/docker/sp
 $sparkyRoutesContent = file_get_contents($rootDir . '/docker/sparky-routes.inc');
 assertTest("docker/sparky-routes.inc blocks direct access to app/courses", strpos($sparkyRoutesContent, 'app/courses') !== false);
 assertTest("docker/sparky-routes.inc routes courses through download handlers (ZERO aliases to disk)", strpos($sparkyRoutesContent, 'alias') === false);
+assertTest("docker/sparky-routes.inc protects /app/upload before generic media rules", strpos($sparkyRoutesContent, 'location ~* ^/app/upload/curriculum/') !== false);
+assertTest("docker/sparky-routes.inc blocks direct unauthenticated /app/upload access", strpos($sparkyRoutesContent, 'location ~ ^/app/upload') !== false);
 
 assertTest("nginx.conf.sample exists", file_exists($rootDir . '/nginx.conf.sample'));
 $sampleNginxContent = file_get_contents($rootDir . '/nginx.conf.sample');
 assertTest("nginx.conf.sample contains ZERO filesystem aliases into app/courses", strpos($sampleNginxContent, 'alias') === false);
 assertTest("nginx.conf.sample blocks direct access to app/courses", strpos($sampleNginxContent, 'app/courses') !== false);
 assertTest("nginx.conf.sample routes course downloads via PHP handler", strpos($sampleNginxContent, 'download.php') !== false);
+assertTest("nginx.conf.sample protects /app/upload before generic media rules", strpos($sampleNginxContent, 'location ~* ^/app/upload/curriculum/') !== false);
+assertTest("nginx.conf.sample blocks direct unauthenticated /app/upload access", strpos($sampleNginxContent, 'location ~ ^/app/upload') !== false);
 
 // -----------------------------------------------------------------------------
 // 3. SECURITY BOUNDARIES & ACCESS CONTROLS (Negative Tests)

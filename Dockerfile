@@ -68,11 +68,17 @@ RUN composer install \
 COPY . .
 
 # Copy entrypoint script and configure runtime permissions
+# Source code remains strictly read-only to PHP-FPM (owned by root:root)
+# Only designated runtime directories (cache, logs, upload, courses) are writable by www-data
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh \
-    && chown -R www-data:www-data /var/www/sparky-lms \
-    && chmod -R 755 /var/www/sparky-lms \
-    && chmod -R 775 /var/www/sparky-lms/app/cache /var/www/sparky-lms/app/logs /var/www/sparky-lms/app/upload /var/www/sparky-lms/app/courses 2>/dev/null || true
+    && chown -R root:root /var/www/sparky-lms \
+    && find /var/www/sparky-lms -type d -exec chmod 755 {} + \
+    && find /var/www/sparky-lms -type f -exec chmod 644 {} + \
+    && chmod 755 /usr/local/bin/entrypoint.sh \
+    && mkdir -p /var/www/sparky-lms/app/cache /var/www/sparky-lms/app/logs /var/www/sparky-lms/app/upload /var/www/sparky-lms/app/courses \
+    && chown -R www-data:www-data /var/www/sparky-lms/app/cache /var/www/sparky-lms/app/logs /var/www/sparky-lms/app/upload /var/www/sparky-lms/app/courses \
+    && chmod -R 775 /var/www/sparky-lms/app/cache /var/www/sparky-lms/app/logs /var/www/sparky-lms/app/upload /var/www/sparky-lms/app/courses
 
 # Expose PHP-FPM port
 EXPOSE 9000

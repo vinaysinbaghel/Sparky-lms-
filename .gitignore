@@ -58,5 +58,12 @@ web/
 node_modules
 yarn.lock
 
+# SSL / TLS Private Keys and Certificates
+docker/ssl/*.pem
+docker/ssl/*.key
+docker/ssl/*.crt
+docker/ssl/*.csr
+
+
 # Temporary/scratch files
 scratch/

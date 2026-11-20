@@ -24,9 +24,19 @@ $scheme = $isHttps ? 'https://' : 'http://';
 $_configuration['root_web']   = $scheme . rtrim($appHost, '/') . '/';
 $_configuration['url_append'] = '';
 
-// 3. Security & Hashing Keys
-// Generate a 32-character random string for production: bin2hex(random_bytes(16))
-$_configuration['security_key'] = getenv('SECURITY_KEY') ?: 'sparky_prod_sec_key_ChangeThisInProduction!';
+// 3. Security & Application Signing Keys
+$envSecurityKey = getenv('SECURITY_KEY');
+if (empty($envSecurityKey) || strlen(trim($envSecurityKey)) < 32) {
+    if (PHP_SAPI !== 'cli') {
+        http_response_code(500);
+        error_log('[Sparky LMS] CRITICAL CONFIGURATION ERROR: SECURITY_KEY environment variable is missing or less than 32 characters.');
+        echo "<h1>Internal Configuration Error</h1><p>Application signing key (SECURITY_KEY) is not properly configured. Please contact the system administrator.</p>";
+        exit(1);
+    }
+    // In CLI test / development runner without env, set safe deterministic entropy
+    $envSecurityKey = 'cli_dev_' . hash('sha256', __DIR__);
+}
+$_configuration['security_key'] = $envSecurityKey;
 $_configuration['password_encryption'] = 'bcrypt';
 
 // 4. Redis Caching & Session Store

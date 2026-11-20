@@ -68,7 +68,29 @@ location ~* ^/courses/([^/]+)/(.*)$ {
     rewrite ^/courses/([^/]+)/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
 }
 
-# Video & Audio Streaming with HTTP 206 Partial Content support
+# Protected Application Upload Storage Routes (Enforce LMS authorization before generic media)
+location ~* ^/app/upload/curriculum/([^/]+)/(.*)$ {
+    rewrite ^/app/upload/curriculum/([^/]+)/(.*)$ /main/document/download_curriculum.php?course=$1&file=$2 last;
+}
+
+location ~* ^/app/upload/users/([^/]+)/([^/]+)/my_files/(.*)$ {
+    rewrite ^/app/upload/users/([^/]+)/([^/]+)/my_files/(.*)$ /main/social/download_my_files.php?user_id=$2&file=$3 last;
+}
+
+# Intentionally public badges
+location ~* ^/app/upload/badges/(.*\.(png|jpg|jpeg|svg|webp))$ {
+    expires 30d;
+    add_header Cache-Control "public, no-transform";
+    try_files $uri =404;
+}
+
+# Block all direct unauthenticated access to remaining /app/upload files
+location ~ ^/app/upload {
+    deny all;
+    return 403;
+}
+
+# Video & Audio Streaming with HTTP 206 Partial Content support (public web assets only)
 location ~* \.(mp4|webm|mkv|mov|ogg|mp3|wav|m4a|pdf)$ {
     expires 7d;
     add_header Cache-Control "public";

@@ -14,6 +14,7 @@ services:
     environment:
       APP_ENV: development
       APP_DEBUG: "true"
+      SECURITY_KEY: ${SECURITY_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
 
   web:
     volumes:

@@ -17,12 +17,13 @@ echo "   SPARKY LMS - REAL HTTP REQUEST & AUTHORIZATION TEST \n";
 echo "========================================================\n";
 echo "Starting test server on http://{$host}:{$port}...\n";
 
-// Start background server process
+// Start background server process with NUL / dev/null pipes to avoid OS buffer deadlocks
+$nullDevice = (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null';
 $cmd = sprintf('php -S %s:%d "%s/router.php"', $host, $port, $rootDir);
 $descriptors = [
     0 => ['pipe', 'r'],
-    1 => ['pipe', 'w'],
-    2 => ['pipe', 'w']
+    1 => ['file', $nullDevice, 'w'],
+    2 => ['file', $nullDevice, 'w']
 ];
 
 $serverProcess = proc_open($cmd, $descriptors, $pipes, $rootDir);
@@ -95,11 +96,14 @@ try {
     runHttpTest("Direct access to composer.json blocked", "{$baseUrl}/composer.json", 403);
     runHttpTest("Direct access to composer.lock blocked", "{$baseUrl}/composer.lock", 403);
     runHttpTest("Direct access to tests directory blocked", "{$baseUrl}/tests/run_test_suite.php", 403);
+    runHttpTest("Direct access to app/upload blocked", "{$baseUrl}/app/upload/test.txt", 403);
+    runHttpTest("Direct access to app/courses directory blocked", "{$baseUrl}/app/courses/BIO101/index.php", 403);
 
     echo "\n--- 2. Directory Traversal & Multi-Pass Encoding Defense ---\n";
     runHttpTest("Raw directory traversal (..) blocked", "{$baseUrl}/database/../index.php", 403);
     runHttpTest("Double-encoded traversal (%252e%252e) blocked", "{$baseUrl}/courses/%252e%252e/%252e%252e/database/sparky_clean_database.sql", 403);
     runHttpTest("Triple-encoded traversal (%25252e%25252e) blocked", "{$baseUrl}/%25252e%25252e/%25252e%25252e/app/config/configuration.php", 403);
+    runHttpTest("Upload directory traversal attempt blocked", "{$baseUrl}/app/upload/../config/configuration.php", 403);
 
     echo "\n--- 3. Protected Course Assets & Authorized Handlers ---\n";
     // Unauthenticated requests to /courses/... must NOT return raw static file; they must route to PHP handlers which redirect or deny
@@ -121,6 +125,14 @@ try {
     });
 
     runHttpTest("Course uploaded files route through upload handler", "{$baseUrl}/courses/BIO101/upload/forum/screenshot.png", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
+        return strpos($body, 'SPARKY_VIDEO_DATA') === false;
+    });
+
+    runHttpTest("Curriculum upload routes through download_curriculum handler", "{$baseUrl}/app/upload/curriculum/BIO101/lecture_module.mp4", [302, 303, 401, 403, 404, 200], [], '', function($body, $headers, $code) {
+        return strpos($body, 'SPARKY_VIDEO_DATA') === false;
+    });
+
+    runHttpTest("User personal files route through download_my_files handler", "{$baseUrl}/app/upload/users/1/1/my_files/confidential.pdf", [302, 303, 401, 403, 404, 200], [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 

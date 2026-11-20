@@ -56,12 +56,24 @@ REDIS_PASSWORD=YourStrongRedisPassword2026!
 REDIS_SESSION_DB=0
 REDIS_CACHE_DB=1
 
-SECURITY_KEY=Your32CharRandomProductionSecurityKey!
+SECURITY_KEY=GenerateWithOpenSSL_openssl_rand_-hex_32
+```
+
+Generate a cryptographically secure 64-character hex `SECURITY_KEY`:
+```bash
+openssl rand -hex 32
 ```
 
 ### Step 3: SSL Certificates
-For development or staging, default self-signed certificates exist in `docker/ssl/`.  
-For production, replace `docker/ssl/cert.pem` and `docker/ssl/key.pem` with your valid certificate and private key:
+For local development and testing, generate development certificates (untracked by git):
+```bash
+# On Linux / macOS:
+bash docker/ssl/generate-certs.sh
+
+# On Windows:
+docker\ssl\generate-certs.bat
+```
+For production, provide valid CA or Let's Encrypt certificates:
 ```bash
 cp /etc/letsencrypt/live/lms.yourdomain.com/fullchain.pem docker/ssl/cert.pem
 cp /etc/letsencrypt/live/lms.yourdomain.com/privkey.pem docker/ssl/key.pem
@@ -138,12 +150,13 @@ cd /var/www/sparky-lms
 # Configure configuration.php
 cp app/config/configuration.php.dist app/config/configuration.php
 
-# Set file permissions
-sudo chown -R www-data:www-data /var/www/sparky-lms
+# Set secure file permissions (Application source is read-only to PHP-FPM)
+sudo chown -R root:root /var/www/sparky-lms
 sudo find /var/www/sparky-lms -type d -exec chmod 755 {} \;
 sudo find /var/www/sparky-lms -type f -exec chmod 644 {} \;
 
-# Writable directories
+# Grant write permissions strictly to mutable runtime storage directories
+sudo chown -R www-data:www-data app/courses app/upload app/cache app/logs
 sudo chmod -R 775 app/courses app/upload app/cache app/logs
 ```
 
@@ -176,11 +189,24 @@ Ensure PHP 8.3+ is installed and present in your system PATH with extensions:
 `curl, fileinfo, gd, intl, json, mbstring, openssl, pdo, xml, zip`.
 
 ### Step 2: Validate Environment
-Run the test suite from the repository root:
+Run the automated test suites from the repository root:
 ```bash
+# 1. Comprehensive static & configuration verification (146 assertions)
 php tests/run_test_suite.php
+
+# 2. Database schema & backup verification (26 assertions)
+php tests/test_database_backup_restore.php
+
+# 3. Real HTTP routing, streaming & negative security (25 assertions)
+php tests/test_http_requests.php
+
+# 4. Concurrency & load benchmark (50, 100, 250 learners)
+php tests/test_concurrency.php
+
+# 5. Full system integration suite (MariaDB + Redis, 63 assertions)
+php tests/test_integration.php
 ```
-All 135 tests must output `[PASS]`.
+All suites must complete with zero errors.
 
 ### Step 3: Run Development Server
 Start the built-in development server using `router.php`:

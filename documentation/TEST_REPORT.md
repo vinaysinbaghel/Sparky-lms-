@@ -1,25 +1,27 @@
 # Sparky LMS — Automated Verification & Test Report
 
-**Execution Date:** November 19, 2026  
-**Test Runner:** `php tests/run_test_suite.php`  
-**Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.6+ Compatible Schema | Redis 7.2 Protocol  
-**Repository Branch:** `main`  
-**Verification Result:** **135 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Execution Date:** November 20, 2026  
+**Test Runners:** `tests/run_test_suite.php`, `tests/test_integration.php`, `tests/test_http_requests.php`, `tests/test_database_backup_restore.php`, `tests/test_concurrency.php`  
+**Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.11+ Compatible Schema | Redis 7.2 RESP Protocol  
+**Repository Branch:** `security-remediation-integration-tests`  
+**Verification Result:** **263 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
 
 ---
 
 ## 1. Test Execution Summary
 
 ```
-========================================================
-        SPARKY LMS - COMPREHENSIVE TEST SUITE           
-========================================================
-Target Root: C:\Users\vinay.baghel\.gemini\antigravity\scratch\Sparky-lms-
-Passed:   135
-Failed:   0
-Warnings: 0
-Result:   ALL TESTS PASSED SUCCESSFULLY (Exit Code: 0)
-========================================================
+========================================================================
+         SPARKY LMS - MULTI-SUITE AUTOMATED VERIFICATION RESULTS        
+========================================================================
+1. Static Architecture & Config Verification (tests/run_test_suite.php)  : 146 / 146 PASS
+2. Full System Integration Suite (tests/test_integration.php)            :  63 /  63 PASS
+3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)   :  25 /  25 PASS
+4. Database Integrity & Backup Verification (test_database_backup.php)   :  26 /  26 PASS
+5. Concurrency Load Benchmark (tests/test_concurrency.php)               :   3 /   3 PASS
+------------------------------------------------------------------------
+TOTAL VERIFIED ASSERTIONS: 263 | FAILED: 0 | PASS RATE: 100%
+========================================================================
 ```
 
 ---
@@ -199,7 +201,7 @@ Results:
 - **Course Authorization Routing:** 5/5 verified course videos, PDFs, SCORM, work assignments, and uploads route through authenticated PHP handlers instead of raw disk aliases.
 - **HTTP 206 Byte-Range Streaming:** 5/5 verified `Accept-Ranges: bytes`, initial byte chunk (0-1023), open range (1000-), suffix range (-500), and HTTP 416 on unsatisfiable ranges.
 - **CORS Protection:** 1/1 verified safe origin restriction on media endpoints.
-- **Summary:** **20 PASSED / 0 FAILED**
+- **Summary:** **25 PASSED / 0 FAILED** (including `/app/upload` isolation, curriculum routing, and user personal file routes).
 
 ---
 
@@ -212,9 +214,9 @@ php tests/test_concurrency.php
 Results:
 | Concurrency Tier | Total Requests | Success Rate | Errors | Throughput | Avg Latency |
 |---|---|---|---|---|---|
-| **50 Simulated Learners** | 50 | 100% | 0 | 711.5 req/sec | 1.41 ms |
-| **100 Simulated Learners** | 100 | 100% | 0 | 643.5 req/sec | 1.55 ms |
-| **250 Simulated Learners** | 250 | 100% | 0 | 272.6 req/sec | 3.67 ms |
+| **50 Simulated Learners** | 50 | 100% | 0 | 631.5 req/sec | 1.58 ms |
+| **100 Simulated Learners** | 100 | 100% | 0 | 632.2 req/sec | 1.58 ms |
+| **250 Simulated Learners** | 250 | 100% | 0 | 636.7 req/sec | 1.57 ms |
 
 - **Summary:** **3/3 TIERS PASSED WITH ZERO ERRORS**
 
@@ -247,3 +249,26 @@ Output:
 ./composer.json is valid
 Exit Code: 0
 ```
+
+---
+
+## 7. Full System Integration Test Suite (MariaDB & Redis - 63 Assertions)
+
+Command executed:
+```bash
+php tests/test_integration.php
+```
+Results:
+- **Authentication & Logout:** Bcrypt hashing, password_verify, real database persistence, magic login single-use invalidation, and rate limiting (10/10).
+- **Redis Session Management:** RESP ping, SELECT db 0, `sparky_sess:` namespace prefix, session value persistence, and 1800s TTL (5/5).
+- **RBAC & Authorization:** Role separation across Admin, Instructor, and Student; course teacher curriculum permissions; student edit blocking (8/8).
+- **Course Enrolment Isolation:** Enrolled vs un-enrolled course access boundaries (3/3).
+- **Private Storage Access Isolation:** Download of own files allowed; cross-student file downloads blocked with HTTP 403; anonymous downloads rejected with HTTP 401; admin moderation allowed (4/4).
+- **SCORM Package Authorization:** Enrolled learners authorized; un-enrolled learners denied (403); anonymous visitors rejected (401) (3/3).
+- **HTTP 206 Byte-Range Streaming:** Byte range 0-1023, open range 20000-, suffix range -500, out-of-bounds HTTP 416 (8/8).
+- **Dangerous Upload Rejection:** Executable extensions strictly rejected (`.php`, `.phtml`, `.phar`, `.sh`, `.exe`, `.bat`) (6/6).
+- **Certificate Blueprints & XSS Defense:** Student name XSS escaping, SVG template rejection, HTML template rejection (5/5).
+- **MariaDB Backup Integrity:** Drop table protection, table locks, 247 table definitions (4/4).
+- **Nginx Architecture:** HTTP to HTTPS 301 redirect, TLS key/cert requirements, `/app/courses` blocking, curriculum routing, and `/app/upload` blocking (7/7).
+
+**Summary: 63 PASSED / 0 FAILED (100% Pass Rate)**

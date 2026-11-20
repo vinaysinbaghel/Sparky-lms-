@@ -18,6 +18,7 @@ services:
       DB_USER: ${DB_USER:-sparky_user}
       DB_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD must be set in .env file}
       APP_HOST: ${APP_HOST:-localhost}
+      SECURITY_KEY: ${SECURITY_KEY:?Error: SECURITY_KEY must be set in .env file}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}

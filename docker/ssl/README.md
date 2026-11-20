@@ -1,29 +1,44 @@
-# Sparky LMS - Docker SSL Certificates
+# Sparky LMS — Docker SSL/TLS Certificates
 
-This directory provides default SSL/TLS certificates for the Sparky LMS Docker Nginx gateway (port 443).
+This directory is the mount point for the Sparky LMS Nginx gateway SSL/TLS certificates (port 443).
 
-## Development / Localhost
-Default self-signed certificates (`cert.pem` and `key.pem`) are included so that the HTTPS service starts immediately out-of-the-box without manual generation.
+> [!WARNING]
+> **No private keys are committed to this repository.**  
+> If an earlier repository commit (`75c9105`) containing a test `key.pem` was ever deployed to any publicly accessible host, that private key is considered compromised and **must be immediately rotated**.
 
-## Production Deployment
-For production, replace these files with your trusted SSL certificates or mount your certificate authority / Let's Encrypt certificates:
+---
 
-1. **Custom Certificates**:
-   - Place your full-chain certificate at `docker/ssl/cert.pem`
-   - Place your private key at `docker/ssl/key.pem`
+## 1. Local Development Setup
 
-2. **Generating New Self-Signed Certificates**:
-   ```bash
-   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-     -keyout docker/ssl/key.pem \
-     -out docker/ssl/cert.pem \
-     -subj "/C=US/ST=State/L=City/O=Organization/CN=yourdomain.com"
-   ```
+To generate a local development certificate and private key, run:
 
-3. **Using Let's Encrypt (Certbot)**:
-   Mount your Certbot certificates into the web container in `docker-compose.yml`:
-   ```yaml
-   volumes:
-     - /etc/letsencrypt/live/yourdomain.com/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
-     - /etc/letsencrypt/live/yourdomain.com/privkey.pem:/etc/nginx/ssl/key.pem:ro
-   ```
+```bash
+# On Linux / macOS:
+bash docker/ssl/generate-certs.sh
+
+# On Windows:
+docker\ssl\generate-certs.bat
+```
+
+This creates:
+- `docker/ssl/cert.pem` (Self-signed X.509 certificate)
+- `docker/ssl/key.pem` (Private key, ignored by `.gitignore`)
+
+---
+
+## 2. Production Deployment
+
+For production deployments, do not use self-signed certificates. Use a trusted certificate authority (CA) or Let's Encrypt:
+
+### Option A: Place Certificates in `docker/ssl/`
+1. Copy your full-chain certificate to `docker/ssl/cert.pem`.
+2. Copy your private key to `docker/ssl/key.pem` (mode `0600`).
+3. Ensure both files are not committed to git (enforced by `.gitignore`).
+
+### Option B: Mount Host Certificates (e.g. Let's Encrypt / Certbot)
+In `docker-compose.yml`, update the `web` service volume mounts:
+```yaml
+volumes:
+  - /etc/letsencrypt/live/yourdomain.com/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
+  - /etc/letsencrypt/live/yourdomain.com/privkey.pem:/etc/nginx/ssl/key.pem:ro
+```

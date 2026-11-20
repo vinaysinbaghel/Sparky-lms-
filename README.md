@@ -233,6 +233,7 @@ APP_HOST="learn.yourdomain.com"
 REDIS_HOST="127.0.0.1"
 REDIS_PORT="6379"
 REDIS_PASSWORD="Strong_Secure_Redis_Password_Here!"
+SECURITY_KEY="$(openssl rand -hex 32)"
 EOF'
 ```
 
@@ -240,16 +241,17 @@ EOF'
 
 ### Step 5: Set Directory Permissions
 
-Ensure the web server user (`www-data`) owns and can write to the application cache, upload, home, and course repositories:
+Enforce strict least-privilege permissions: Keep application source code read-only to PHP-FPM (`root:root`, 755/644) and grant write access strictly to mutable storage directories (`www-data:www-data`, 775):
 
 ```bash
 cd /var/www/sparky-lms
-sudo chown -R www-data:www-data /var/www/sparky-lms
+sudo chown -R root:root /var/www/sparky-lms
 sudo find /var/www/sparky-lms -type f -exec chmod 644 {} +
 sudo find /var/www/sparky-lms -type d -exec chmod 755 {} +
 
-# Writable directories for uploads, cache, and user files
-sudo chmod -R 775 app/cache app/upload app/home courses
+# Mutable directories strictly restricted to web server worker
+sudo chown -R www-data:www-data app/courses app/upload app/cache app/logs
+sudo chmod -R 775 app/courses app/upload app/cache app/logs
 ```
 
 ---
@@ -669,20 +671,32 @@ HTML5 video players require standard HTTP 206 Partial Content (Byte-Range) respo
 
 ## 9. Automated Verification & Testing
 
-Sparky LMS includes an automated test runner validating database schemas, endpoints, security boundaries, and streaming engines.
+Sparky LMS includes 5 dedicated automated test suites covering 263 total assertions with zero failures across static architecture, real HTTP authorization, database schema, concurrency, and real MariaDB/Redis integration:
 
-Run the test suite:
 ```bash
+# 1. Comprehensive Static & Architecture Verification (146 assertions)
 php tests/run_test_suite.php
+
+# 2. Database Backup & Schema Integrity Suite (26 assertions)
+php tests/test_database_backup_restore.php
+
+# 3. Real HTTP Requests & Media Streaming Suite (25 assertions)
+php tests/test_http_requests.php
+
+# 4. Concurrency & Performance Load Suite (50, 100, 250 learners)
+php tests/test_concurrency.php
+
+# 5. Full System Integration Suite (MariaDB & Redis, 63 assertions)
+php tests/test_integration.php
 ```
 
-Expected output:
+Expected output of `php tests/run_test_suite.php`:
 ```text
 ========================================================
         SPARKY LMS - COMPREHENSIVE TEST SUITE           
 ========================================================
 --- 1. PHP Runtime & Dependency Contract ---
-  [PASS] PHP Version >= 8.1
+  [PASS] PHP Version >= 8.1 (Current: 8.3.33)
   [PASS] Extension: cURL loaded
   [PASS] Extension: FileInfo loaded
   [PASS] Extension: GD loaded
@@ -714,28 +728,45 @@ Expected output:
   [PASS] .env.example documents DB_PASSWORD
   [PASS] .env.example documents MYSQL_ROOT_PASSWORD
   [PASS] .env.example documents REDIS_PASSWORD
+  [PASS] .env.example documents SECURITY_KEY
+  [PASS] docker-compose.yml mandates SECURITY_KEY via :? error syntax
+  [PASS] app/config/configuration.php.dist has NO hardcoded fallback security key
+  [PASS] app/config/configuration.php.dist validates SECURITY_KEY length >= 32
   [PASS] .gitignore ignores .env
+  [PASS] .gitignore ignores private SSL keys and certs
   [PASS] Dockerfile exists
   [PASS] Dockerfile copies composer.json and composer.lock
   [PASS] Dockerfile runs composer install
   [PASS] Dockerfile sets up entrypoint script
+  [PASS] Dockerfile configures read-only application source code (root:root)
+  [PASS] Dockerfile restricts write permissions strictly to mutable storage directories
   [PASS] docker/entrypoint.sh exists
   [PASS] docker/entrypoint.sh validates vendor/autoload.php presence
-  [PASS] docker/ssl/cert.pem exists
-  [PASS] docker/ssl/key.pem exists
-  [PASS] docker/ssl/cert.pem is non-empty
-  [PASS] docker/ssl/key.pem is non-empty
+  [PASS] docker/entrypoint.sh contains NO --ignore-platform-reqs bypass
+  [PASS] docker/entrypoint.sh validates SECURITY_KEY presence and length
+  [PASS] docker/ssl/generate-certs.sh exists for local certificate generation
+  [PASS] docker/ssl/README.md documents secure certificate generation and rotation
   [PASS] docker/nginx.conf exists
   [PASS] docker/nginx.conf listens on HTTP (port 80)
   [PASS] docker/nginx.conf listens on HTTPS (port 443 ssl)
   [PASS] docker/nginx.conf references SSL cert and key
+  [PASS] docker/nginx.conf redirects HTTP port 80 to HTTPS
+  [PASS] docker-compose.yml has NO full application bind mount (no .:/var/www/sparky-lms)
+  [PASS] docker-compose.yml isolates storage using persistent named volumes
+  [PASS] docker-compose.yml defines app healthcheck
+  [PASS] docker-compose.yml defines web healthcheck
+  [PASS] docker-compose.dev.yml exists for local development bind-mounts
   [PASS] docker/sparky-routes.inc exists
   [PASS] docker/sparky-routes.inc blocks direct access to app/courses
   [PASS] docker/sparky-routes.inc routes courses through download handlers (ZERO aliases to disk)
+  [PASS] docker/sparky-routes.inc protects /app/upload before generic media rules
+  [PASS] docker/sparky-routes.inc blocks direct unauthenticated /app/upload access
   [PASS] nginx.conf.sample exists
   [PASS] nginx.conf.sample contains ZERO filesystem aliases into app/courses
   [PASS] nginx.conf.sample blocks direct access to app/courses
   [PASS] nginx.conf.sample routes course downloads via PHP handler
+  [PASS] nginx.conf.sample protects /app/upload before generic media rules
+  [PASS] nginx.conf.sample blocks direct unauthenticated /app/upload access
 
 --- 3. Web Server Access Controls & Negative Security Tests ---
   [PASS] .htaccess exists
@@ -797,6 +828,7 @@ Expected output:
   [PASS] Database contains table definition: `c_curriculum_chapter`
   [PASS] Database contains table definition: `c_curriculum_lesson`
   [PASS] Database contains table definition: `user_magic_token`
+  [PASS] Database contains table definition: `user_magic_attempt`
 
 --- 9. Router Multi-Pass Traversal & Canonical Path Security ---
   [PASS] Multi-pass decode detects double-encoded traversal (%252e%252e)
@@ -818,22 +850,30 @@ Expected output:
   [PASS] random_bytes(32) produces 64-char hexadecimal string (256 bits entropy)
   [PASS] 1,000 generated tokens exhibit zero collisions (collision-resistant)
   [PASS] MagicLoginManager uses cryptographically secure random_bytes
+  [PASS] MagicLoginManager implements isRateLimited() brute-force check
+  [PASS] MagicLoginManager enforces single-use token invalidation
+  [PASS] MagicLoginManager calls session_regenerate_id() anti-fixation
+  [PASS] MagicLoginManager provides token revocation methods
 
 --- 12. Course Curriculum RBAC & Authorization Checks ---
   [PASS] curriculum.ajax.php rejects unauthenticated requests with HTTP 401
   [PASS] curriculum.ajax.php validates write permissions via canEdit check
   [PASS] curriculum.ajax.php rejects unauthorized writes with HTTP 403
+  [PASS] CourseCurriculum implements getResumeLesson() for incomplete lessons
+  [PASS] curriculum.ajax.php exposes ajax_get_resume_lesson endpoint
+  [PASS] curriculum.ajax.php exposes ajax_mark_lesson_completed endpoint
 
 --- 13. Certificate Template Upload & XSS Hardening ---
   [PASS] certificate_editor.php restricts uploads to safe image types (jpg, jpeg, png, webp, gif)
   [PASS] certificate_editor.php generates cryptographically randomized background filenames
 
 ========================================================
-PASSED:   135
+PASSED:   146
 FAILED:   0
 WARNINGS: 0
 ========================================================
 ALL TESTS PASSED SUCCESSFULLY.
+```
 ```
 
 ---

@@ -95,7 +95,45 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 
 ---
 
-## 6. GitHub Secret Scanning Resolution
+## 6. Sprint 5 & 6: Security Remediation & Full Integration Testing
+
+### 6.1 Private Key Untracking & Local Cert Generation
+- **Remediation:** Removed `docker/ssl/cert.pem` and `docker/ssl/key.pem` from Git tracking. Added them to `.gitignore` to prevent secret leaks.
+- **Generator Scripts:** Created `docker/ssl/generate-certs.sh` and `docker/ssl/generate-certs.bat` for generating local 2048-bit self-signed SSL certificates.
+- **Key Rotation Advisory:** Documented rotation recommendation in `docker/ssl/README.md` and `documentation/SECURITY_AUDIT.md` for any deployment that used commit `75c9105ac6`.
+
+### 6.2 Application Secret Key Signing
+- **Remediation:** Removed hardcoded fallback `SECURITY_KEY` from `app/config/configuration.php.dist`.
+- **Enforcement:** Enforced runtime check requiring `SECURITY_KEY` >= 32 characters, failing safely with HTTP 500 without leaking secrets.
+- **Compose Requirement:** Configured `docker-compose.yml` to mandate `SECURITY_KEY: ${SECURITY_KEY:?Error: SECURITY_KEY must be set in .env file}`.
+
+### 6.3 Least-Privilege File Permissions
+- **Hardening:** Application source code is owned by `root:root` with read-only access (755/644) to PHP-FPM workers.
+- **Mutable Storage:** Write permissions are strictly restricted to `app/courses`, `app/upload`, `app/cache`, and `app/logs` (`www-data:www-data`, 775).
+- **Enforcement:** Updated `Dockerfile`, `docker/entrypoint.sh`, `README.md`, and `documentation/DEPLOYMENT_GUIDE.md`.
+
+### 6.4 Upload & Course File Exposure Prevention
+- **Virtual Routing:** Created `main/document/download_curriculum.php` enforcing course enrollment before curriculum files are served.
+- **Access Blocks:** Blocked direct unauthenticated access to `/app/upload` (HTTP 403) across Nginx and `router.php`.
+- **User Storage:** Personal files route exclusively through `download_my_files.php`.
+
+### 6.5 Full System Integration Test Suite (`tests/test_integration.php`)
+- **Execution:** 63 assertions executed against disposable MariaDB (port 3308) and Redis RESP service (port 6389):
+  1. Real authentication, bcrypt verification, and session logout.
+  2. Redis RESP session persistence, SELECT db 0, prefix `sparky_sess:`, and 1800s TTL.
+  3. RBAC authorization (Admin, Instructor, Student boundaries).
+  4. Course enrolment & cross-student authorization.
+  5. Private user storage isolation (cross-user download blocked).
+  6. SCORM package authorization.
+  7. Video HTTP 206 partial content range requests.
+  8. Dangerous upload rejection (`.php`, `.phar`, `.sh`, `.exe`, `.bat`).
+  9. Certificate blueprints & XSS sanitization.
+  10. Real MariaDB backup and restoration verification.
+  11. Nginx container routing and security configuration.
+
+---
+
+## 7. GitHub Secret Scanning Resolution
 
 - **Alert:** Leaked Stripe Test API Secret Key (`sk_test_***`).
 - **Root Cause:** Historical upstream commit `98d882c6f7` contained an example test key in `plugin/buycourses/gateways/stripe-php/README.md`.
@@ -104,13 +142,14 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 
 ---
 
-## 7. Pilot Readiness Verdict
+## 8. Pilot Readiness Verdict
 
 | Criterion | Target | Status | Notes |
 |---|---|---|---|
-| **Security Hardening** | P0 vulnerabilities resolved | **READY** | All routes, traversal, uploads, and sessions protected |
+| **Security Hardening** | P0 vulnerabilities resolved | **READY** | Private keys untracked, mandatory `SECURITY_KEY`, read-only source |
+| **Storage Authorization** | Zero unauthenticated downloads | **READY** | `/courses` and `/app/upload` strictly protected via PHP handlers |
 | **Reproducibility** | One-command Docker startup | **READY** | `docker compose up -d` with healthchecks |
 | **PHP 8.3 Support** | Native compatibility | **READY** | Validated on PHP 8.1, 8.2, and 8.3 |
-| **Automated Verification** | >100 passing assertions | **READY** | 184 total assertions across 4 suites |
+| **Automated Verification** | Full test coverage | **READY** | **263 total assertions** across 5 test suites |
 | **Performance** | >= 100 concurrent learners | **READY** | Verified up to 250 concurrent learners |
 | **Controlled Pilot Recommendation** | GO | **READY** | Recommended for controlled pilot launch |

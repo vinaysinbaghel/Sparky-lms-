@@ -5,6 +5,9 @@
  * HTTP 206 Partial Content (Byte-Range requests) for Video, Audio, and PDF streaming.
  */
 
+// Guarantee working directory is always repo root on each incoming request
+chdir(__DIR__);
+
 $rawUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // Iterative URL decoding to defeat multiple URL-encoding attacks (%252e%252e -> %2e%2e -> ..)
@@ -267,6 +270,55 @@ if (preg_match('#^/course/(\d+)/about/?$#', $uri, $matches)) {
     $_SERVER['SCRIPT_FILENAME'] = $docRoot . '/main/course_info/about.php';
     chdir($docRoot . '/main/course_info');
     require $docRoot . '/main/course_info/about.php';
+    exit;
+}
+
+// -----------------------------------------------------------------------------
+// Protected Upload Routes (Enforce LMS authorization before generic media)
+// -----------------------------------------------------------------------------
+// Curriculum media uploads: Route through download_curriculum.php
+if (preg_match('#^/app/upload/curriculum/([^/]+)/(.*)$#', $uri, $matches)) {
+    $courseCode = $matches[1];
+    $relFile = $matches[2];
+    $_GET['course'] = $courseCode;
+    $_GET['file'] = $relFile;
+    $_REQUEST['course'] = $courseCode;
+    $_REQUEST['file'] = $relFile;
+    $_SERVER['SCRIPT_NAME'] = '/main/document/download_curriculum.php';
+    $_SERVER['PHP_SELF'] = '/main/document/download_curriculum.php';
+    $_SERVER['SCRIPT_FILENAME'] = $docRoot . '/main/document/download_curriculum.php';
+    chdir($docRoot . '/main/document');
+    require $docRoot . '/main/document/download_curriculum.php';
+    exit;
+}
+
+// User personal files: Route through download_my_files.php
+if (preg_match('#^/app/upload/users/([^/]+)/([^/]+)/my_files/(.*)$#', $uri, $matches)) {
+    $targetUserId = (int)$matches[2];
+    $relFile = $matches[3];
+    $_GET['user_id'] = $targetUserId;
+    $_GET['file'] = $relFile;
+    $_REQUEST['user_id'] = $targetUserId;
+    $_REQUEST['file'] = $relFile;
+    $_SERVER['SCRIPT_NAME'] = '/main/social/download_my_files.php';
+    $_SERVER['PHP_SELF'] = '/main/social/download_my_files.php';
+    $_SERVER['SCRIPT_FILENAME'] = $docRoot . '/main/social/download_my_files.php';
+    chdir($docRoot . '/main/social');
+    require $docRoot . '/main/social/download_my_files.php';
+    exit;
+}
+
+// Public badges
+if (preg_match('#^/app/upload/badges/.*\.(png|jpg|jpeg|svg|webp)$#i', $uri)) {
+    if (is_file($filePath)) {
+        return false;
+    }
+}
+
+// Block direct unauthenticated access to all remaining /app/upload paths
+if (preg_match('#^/app/(upload|courses)#i', $cleanUri)) {
+    http_response_code(403);
+    echo "403 Forbidden: Direct access to application storage is denied.";
     exit;
 }
 
