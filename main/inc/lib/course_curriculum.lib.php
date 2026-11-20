@@ -570,6 +570,40 @@ public static function formatVideoEmbedUrl($url)
         return $completedIds;
     }
 
+    /**
+     * Finds the next incomplete lesson for the user in a course to support resuming learning.
+     *
+     * @param int $userId
+     * @param string $courseCode
+     * @return array|null
+     */
+    public static function getResumeLesson($userId, $courseCode)
+    {
+        self::initTables();
+        $userId = (int)$userId;
+        $courseCode = Database::escape_string($courseCode);
+        $chapters = self::getCurriculum($courseCode);
+        
+        $completedIds = self::getUserCompletedLessons($userId, $courseCode);
+        $firstLesson = null;
+
+        foreach ($chapters as $ch) {
+            if (empty($ch['lessons'])) continue;
+            foreach ($ch['lessons'] as $l) {
+                if (empty($l['is_draft'])) {
+                    if (!$firstLesson) {
+                        $firstLesson = $l;
+                    }
+                    if (!in_array((int)$l['id'], $completedIds, true)) {
+                        return $l;
+                    }
+                }
+            }
+        }
+
+        return $firstLesson;
+    }
+
     public static function saveUserLessonCompletion($userId, $courseCode, $lessonId, $completed = 1)
     {
         self::initTables();

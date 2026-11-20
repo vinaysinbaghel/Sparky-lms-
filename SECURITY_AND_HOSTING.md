@@ -31,11 +31,11 @@ All findings identified in the audit report have been fully remediated:
 ## 2. GitHub Secret Scanning Alert Resolution
 
 ### What Triggered the Alert?
-- **Secret Detected:** `Stripe Test API Secret Key (sk_test_BQokikJ0vBiI2HlwgH4...)`
+- **Secret Detected:** `Stripe Test API Secret Key (sk_test_***)`
 - **Location reported by GitHub:** `plugin/.../stripe-php/README.md:56`
 
 ### Root Cause & Dismissal
-1. `sk_test_BQokikJOvBiI2HlWgH4olfQ2` is **Stripe's official public documentation sandbox key** from the upstream `stripe-php` library sample README. It does not belong to any active account or live financial data.
+1. `sk_test_***` was **Stripe's official public documentation sandbox key** from the upstream `stripe-php` library sample README. It does not belong to any active account or live financial data.
 2. The `plugin/buycourses/gateways/stripe-php` directory was deleted in commit `7db4d6bec3`.
 3. GitHub Secret Scanning flags historical commits in the Git graph.
 4. **Action:** Navigate to [GitHub Security > Secret scanning](https://github.com/vinaysinbaghel/Sparky-lms-/security/secret-scanning) and close the alert as **"Used in tests"** or **"False positive"**.

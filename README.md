@@ -264,17 +264,57 @@ sudo apt install -y nginx
 Create `/etc/nginx/sites-available/sparky-lms.conf`:
 
 ```nginx
+# ==============================================================================
+# 1. HTTP Server - ACME Challenge & Automatic HTTPS Redirection
+# ==============================================================================
 server {
     listen 80;
+    listen [::]:80;
+    server_name learn.yourdomain.com;
+    root /var/www/sparky-lms;
+
+    # Allow Let's Encrypt ACME verification without redirection
+    location ^~ /.well-known/acme-challenge/ {
+        allow all;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    # Redirect all other HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ==============================================================================
+# 2. HTTPS Server - Fully Hardened Production Host
+# ==============================================================================
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name learn.yourdomain.com;
     root /var/www/sparky-lms;
     index index.php index.html;
+
+    # SSL Certificates (Managed via Certbot)
+    ssl_certificate /etc/letsencrypt/live/learn.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/learn.yourdomain.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
 
     client_max_body_size 512M;
     client_body_buffer_size 128k;
 
     access_log /var/log/nginx/sparky_access.log combined buffer=64k flush=5m;
     error_log /var/log/nginx/sparky_error.log warn;
+
+    # Security Headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     # Gzip compression for text assets
     gzip on;
@@ -283,22 +323,85 @@ server {
     gzip_comp_level 6;
     gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml font/truetype font/opentype application/vnd.ms-fontobject image/svg+xml;
 
-    # Security: Block sensitive directories & internal files
+    # --------------------------------------------------------------------------
+    # 3. Access Controls: Block Sensitive Directories & Files
+    # --------------------------------------------------------------------------
     location ~ ^/(tests|\.git|\.github|database|bin|scratch|app/config|app/logs|app/cache|app/courses) {
         deny all;
         return 403;
     }
 
-    # Security: Block database backups, scripts, configs, lockfiles
     location ~* \.(sql|bat|sh|yml|yaml|dist|lock|log|env|ini|md)$ {
         deny all;
         return 403;
     }
 
-    # Security: Prevent execution of PHP in writable upload directories
-    location ~* ^/app/(upload|courses|cache|logs)/.*\.php$ {
+    # Prevent direct PHP execution in writable upload directories
+    location ~* ^/app/(upload|courses|cache|logs)/.*\.ph(p[34578]?|t|tml|ar)$ {
         deny all;
         return 403;
+    }
+
+    # --------------------------------------------------------------------------
+    # 4. Protected Course Routing (MUST TAKE PRECEDENCE OVER MEDIA STREAMING)
+    # --------------------------------------------------------------------------
+    # Clean Certificate Verification Route
+    location = /certificates/ {
+        rewrite ^/certificates/$ /certificates/index.php last;
+    }
+
+    # Course Home
+    location ~* ^/courses/([^/]+)/?$ {
+        rewrite ^/courses/([^/]+)/?$ /main/course_home/course_home.php?cDir=$1 last;
+    }
+
+    location ~* ^/courses/([^/]+)/index\.php$ {
+        rewrite ^/courses/([^/]+)/index\.php$ /main/course_home/course_home.php?cDir=$1 last;
+    }
+
+    # SCORM Packages & Assets (Protected via download_scorm handler)
+    location ~* ^/courses/([^/]+)/scorm/(.*)$ {
+        rewrite ^/courses/([^/]+)/scorm/(.*)$ /main/document/download_scorm.php?doc_url=/$2&cDir=$1 last;
+    }
+
+    # Course Documents & Certificates (Protected via download handler)
+    location ~* ^/courses/([^/]+)/document/(.*)$ {
+        rewrite ^/courses/([^/]+)/document/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
+    }
+
+    # Course Upload Files (Protected via download handler)
+    location ~* ^/courses/([^/]+)/upload/([^/]+)/(.*)$ {
+        rewrite ^/courses/([^/]+)/upload/([^/]+)/(.*)$ /main/document/download_uploaded_files.php?code=$1&type=$2&file=$3 last;
+    }
+
+    # Course Work & Assignment Submissions (Protected via work handler)
+    location ~* ^/courses/([^/]+)/work/(.*)$ {
+        rewrite ^/courses/([^/]+)/work/(.*)$ /main/work/download.php?file=work/$2&cDir=$1 last;
+    }
+
+    # Course Thumbnails
+    location ~* ^/courses/([^/]+)/course-pic85x85\.png$ {
+        rewrite ^ /main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_source last;
+    }
+
+    location ~* ^/courses/([^/]+)/course-pic\.png$ {
+        rewrite ^ /main/inc/ajax/course.ajax.php?a=get_course_image&code=$1&image=course_image_large_source last;
+    }
+
+    # Catch-all Course Asset Route: Enforce LMS Enrollment via download handler
+    location ~* ^/courses/([^/]+)/(.*)$ {
+        rewrite ^/courses/([^/]+)/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
+    }
+
+    # --------------------------------------------------------------------------
+    # 5. Static Assets & Media Streaming (Evaluated AFTER Course Protection)
+    # --------------------------------------------------------------------------
+    # Video & Audio Streaming with HTTP 206 Byte-Range Seeking Support
+    location ~* \.(mp4|webm|mkv|mov|ogg|mp3|wav|m4a|pdf)$ {
+        expires 7d;
+        add_header Cache-Control "public";
+        add_header Accept-Ranges bytes;
+        try_files $uri =404;
     }
 
     # Static Assets with browser caching
@@ -308,30 +411,9 @@ server {
         try_files $uri =404;
     }
 
-    # Video & Audio Streaming with HTTP 206 Byte-Range Seeking Support
-    location ~* \.(mp4|webm|mkv|mov|ogg|mp3|wav|m4a|pdf)$ {
-        expires 7d;
-        add_header Cache-Control "public";
-        add_header Accept-Ranges bytes;
-        try_files $uri =404;
-    }
-
-    # Certificate Verification Route
-    location ~ ^/certificates/?$ {
-        rewrite ^/certificates/?$ /certificates/index.php last;
-    }
-
-    # Course Virtual Route Rewriting
-    location ~ ^/courses/([^/]+)/?$ {
-        rewrite ^/courses/([^/]+)/?$ /main/course_home/course_home.php?cDir=$1 last;
-    }
-
-    # Protected Course Downloads (Enforces student enrollment & LMS authentication)
-    location ~* ^/courses/([^/]+)/(.*)$ {
-        rewrite ^/courses/([^/]+)/(.*)$ /main/document/download.php?doc_url=/$2&cDir=$1 last;
-    }
-
-    # Core Application Gateway
+    # --------------------------------------------------------------------------
+    # 6. Core Application Gateway & FastCGI
+    # --------------------------------------------------------------------------
     location / {
         try_files $uri $uri/ /index.php?$args;
     }
@@ -747,7 +829,7 @@ Expected output:
   [PASS] certificate_editor.php generates cryptographically randomized background filenames
 
 ========================================================
-PASSED:   121
+PASSED:   135
 FAILED:   0
 WARNINGS: 0
 ========================================================
@@ -763,7 +845,9 @@ Comprehensive engineering and security documentation is available in the [`docum
 - 📘 [Engineering Audit & Architecture Inventory](documentation/ENGINEERING_AUDIT.md) — Comprehensive breakdown of core Chamilo foundation vs. custom Sparky subsystems.
 - 🛡️ [Security Audit & Vulnerability Remediation](documentation/SECURITY_AUDIT.md) — Analysis of threats, remediation implementations, and secret scanning resolution.
 - 🚀 [Production & Local Deployment Guide](documentation/DEPLOYMENT_GUIDE.md) — Verified setup instructions for Docker Compose, Ubuntu/Debian Linux, and local Windows development.
-- 🧪 [Automated Verification & Test Report](documentation/TEST_REPORT.md) — Detailed results of the 121-assertion automated verification suite across all 13 categories.
+- 🧪 [Automated Verification & Test Report](documentation/TEST_REPORT.md) — Detailed results of the 135-assertion automated verification suite across all 13 categories.
+- 📋 [Release Changelog & Pilot Readiness](documentation/RELEASE_CHANGELOG.md) — Sprint changelog, resolved blockers, and controlled pilot deployment checklist.
+- 🧭 [Controlled Pilot Walkthrough & UI Guide](documentation/PILOT_WALKTHROUGH.md) — Comprehensive journey walkthroughs for Admin, Instructor, and Student.
 
 ---
 

@@ -138,12 +138,12 @@ A comprehensive, defense-in-depth security audit of the Sparky LMS application c
 
 ### 3.1 Alert Context
 
-- **Detected Secret:** `Stripe Test API Secret Key` (`sk_test_BQokikJ0vBiI2HlwgH4...`)
+- **Detected Secret:** `Stripe Test API Secret Key` (`sk_test_***`)
 - **Detection Location:** `plugin/buycourses/src/gateways/stripe-php/README.md:56`
 - **Origin Commit:** Commit `98d882c6f7` (Nov 22, 2021) in upstream Chamilo repository (`add stripe libs`).
 - **Working Tree Status:** **Not present in the repository working tree.** The file and directory were completely removed in upstream commit `7db4d6bec3` (Feb 3, 2022).
 - **Security Assessment:**  
-  `sk_test_BQokikJ0vBiI2HlwgH4...` is **Stripe's official public documentation sandbox key**, published in Stripe's open-source SDK sample files. It is not associated with any private bank account, live customer data, or live transactions.
+  `sk_test_***` was **Stripe's official public documentation sandbox key**, published in Stripe's open-source SDK sample files. It is not associated with any private bank account, live customer data, or live transactions.
 
 ### 3.2 Resolution Instructions for Repository Administrator
 

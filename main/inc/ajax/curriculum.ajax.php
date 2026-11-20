@@ -192,5 +192,41 @@ if ($action === 'ajax_delete_lesson') {
     exit;
 }
 
+// 5. MARK LESSON COMPLETED (Learner Journey)
+if ($action === 'ajax_mark_lesson_completed' || $action === 'mark_completed') {
+    $lessonId = isset($_REQUEST['lesson_id']) ? (int)$_REQUEST['lesson_id'] : (isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : 0);
+    if ($lessonId > 0 && $currentUserId > 0 && !empty($courseCode)) {
+        CourseCurriculum::saveUserLessonCompletion($currentUserId, $courseCode, $lessonId, 1);
+        $progress = CourseCurriculum::getUserProgress($currentUserId, $courseCode);
+        echo json_encode([
+            'success' => true,
+            'lesson_id' => $lessonId,
+            'completed' => true,
+            'course_progress' => $progress
+        ]);
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid parameters for completion tracking.']);
+        exit;
+    }
+}
+
+// 6. GET RESUME LESSON (Learner Journey)
+if ($action === 'ajax_get_resume_lesson' || $action === 'get_resume_lesson') {
+    if ($currentUserId > 0 && !empty($courseCode)) {
+        $resumeLesson = CourseCurriculum::getResumeLesson($currentUserId, $courseCode);
+        $progress = CourseCurriculum::getUserProgress($currentUserId, $courseCode);
+        echo json_encode([
+            'success' => true,
+            'resume_lesson' => $resumeLesson,
+            'course_progress' => $progress
+        ]);
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Invalid parameters.']);
+        exit;
+    }
+}
+
 echo json_encode(['success' => false, 'error' => 'Unknown action: ' . htmlspecialchars($action)]);
 exit;

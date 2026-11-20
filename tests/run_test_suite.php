@@ -117,6 +117,13 @@ $dockerNginxContent = file_get_contents($rootDir . '/docker/nginx.conf');
 assertTest("docker/nginx.conf listens on HTTP (port 80)", strpos($dockerNginxContent, 'listen 80;') !== false);
 assertTest("docker/nginx.conf listens on HTTPS (port 443 ssl)", strpos($dockerNginxContent, 'listen 443 ssl') !== false);
 assertTest("docker/nginx.conf references SSL cert and key", strpos($dockerNginxContent, '/etc/nginx/ssl/cert.pem') !== false && strpos($dockerNginxContent, '/etc/nginx/ssl/key.pem') !== false);
+assertTest("docker/nginx.conf redirects HTTP port 80 to HTTPS", strpos($dockerNginxContent, 'return 301 https://$host$request_uri;') !== false);
+
+assertTest("docker-compose.yml has NO full application bind mount (no .:/var/www/sparky-lms)", strpos($dockerComposeContent, '.:/var/www/sparky-lms') === false);
+assertTest("docker-compose.yml isolates storage using persistent named volumes", strpos($dockerComposeContent, 'sparky_courses:') !== false && strpos($dockerComposeContent, 'sparky_upload:') !== false);
+assertTest("docker-compose.yml defines app healthcheck", strpos($dockerComposeContent, 'container_name: sparky_app') !== false && strpos($dockerComposeContent, 'file_exists') !== false);
+assertTest("docker-compose.yml defines web healthcheck", strpos($dockerComposeContent, 'container_name: sparky_web') !== false && strpos($dockerComposeContent, 'wget --spider') !== false);
+assertTest("docker-compose.dev.yml exists for local development bind-mounts", file_exists($rootDir . '/docker-compose.dev.yml'));
 
 assertTest("docker/sparky-routes.inc exists", file_exists($rootDir . '/docker/sparky-routes.inc'));
 $sparkyRoutesContent = file_get_contents($rootDir . '/docker/sparky-routes.inc');
@@ -313,7 +320,7 @@ $dbSqlHeader = file_get_contents($dbSqlPath, false, null, 0, 1024);
 assertTest("Database dump has valid MariaDB / MySQL dump header", strpos($dbSqlHeader, 'MariaDB dump') !== false || strpos($dbSqlHeader, 'MySQL dump') !== false);
 
 // Check presence of key tables in the dump
-$keyTables = ['user', 'course', 'session', 'c_document', 'c_item_property', 'c_certificate_blueprint', 'c_curriculum_chapter', 'c_curriculum_lesson', 'user_magic_token'];
+$keyTables = ['user', 'course', 'session', 'c_document', 'c_item_property', 'c_certificate_blueprint', 'c_curriculum_chapter', 'c_curriculum_lesson', 'user_magic_token', 'user_magic_attempt'];
 foreach ($keyTables as $tbl) {
     $found = false;
     // Check table creation
@@ -394,6 +401,10 @@ assertTest("1,000 generated tokens exhibit zero collisions (collision-resistant)
 
 $magicLibContent = file_get_contents($rootDir . '/main/inc/lib/magic_login.lib.php');
 assertTest("MagicLoginManager uses cryptographically secure random_bytes", strpos($magicLibContent, 'bin2hex(random_bytes(32))') !== false);
+assertTest("MagicLoginManager implements isRateLimited() brute-force check", strpos($magicLibContent, 'function isRateLimited(') !== false);
+assertTest("MagicLoginManager enforces single-use token invalidation", strpos($magicLibContent, "used_at = '") !== false && strpos($magicLibContent, "expires_at = '") !== false);
+assertTest("MagicLoginManager calls session_regenerate_id() anti-fixation", strpos($magicLibContent, 'session_regenerate_id(true)') !== false);
+assertTest("MagicLoginManager provides token revocation methods", strpos($magicLibContent, 'function revokeToken(') !== false && strpos($magicLibContent, 'function revokeTokensForUser(') !== false);
 
 // -----------------------------------------------------------------------------
 // 12. COURSE CURRICULUM RBAC & AUTHORIZATION CHECKS
@@ -403,6 +414,11 @@ $curriculumAjaxContent = file_get_contents($rootDir . '/main/inc/ajax/curriculum
 assertTest("curriculum.ajax.php rejects unauthenticated requests with HTTP 401", strpos($curriculumAjaxContent, 'http_response_code(401)') !== false);
 assertTest("curriculum.ajax.php validates write permissions via canEdit check", strpos($curriculumAjaxContent, '$canEdit') !== false);
 assertTest("curriculum.ajax.php rejects unauthorized writes with HTTP 403", strpos($curriculumAjaxContent, 'http_response_code(403)') !== false);
+
+$curriculumLibContent = file_get_contents($rootDir . '/main/inc/lib/course_curriculum.lib.php');
+assertTest("CourseCurriculum implements getResumeLesson() for incomplete lessons", strpos($curriculumLibContent, 'function getResumeLesson(') !== false);
+assertTest("curriculum.ajax.php exposes ajax_get_resume_lesson endpoint", strpos($curriculumAjaxContent, 'ajax_get_resume_lesson') !== false);
+assertTest("curriculum.ajax.php exposes ajax_mark_lesson_completed endpoint", strpos($curriculumAjaxContent, 'ajax_mark_lesson_completed') !== false);
 
 // -----------------------------------------------------------------------------
 // 13. CERTIFICATE TEMPLATE & XSS PROTECTION

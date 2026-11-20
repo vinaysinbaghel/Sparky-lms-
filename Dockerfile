@@ -62,8 +62,7 @@ RUN composer install \
     --prefer-dist \
     --no-interaction \
     --no-progress \
-    --optimize-autoloader \
-    --ignore-platform-reqs
+    --optimize-autoloader
 
 # Copy application source code
 COPY . .

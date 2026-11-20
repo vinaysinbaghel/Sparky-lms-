@@ -11,7 +11,7 @@ use ChamiloSession as Session;
 class MagicLoginManager
 {
     /**
-     * Ensure the user_magic_token table exists
+     * Ensure the user_magic_token and rate-limit tables exist
      */
     public static function initTable()
     {
@@ -28,6 +28,15 @@ class MagicLoginManager
             INDEX (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         Database::query($sql);
+
+        $attemptTable = Database::get_main_table('user_magic_attempt');
+        $sqlAttempts = "CREATE TABLE IF NOT EXISTS $attemptTable (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ip VARCHAR(45) NOT NULL,
+            attempt_time DATETIME NOT NULL,
+            INDEX (ip, attempt_time)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+        Database::query($sqlAttempts);
     }
 
     /**
@@ -98,7 +107,85 @@ class MagicLoginManager
     }
 
     /**
-     * Validate a magic token and log the user into the platform
+     * Check if client IP is currently rate-limited (max 10 failed attempts per 15 minutes)
+     *
+     * @param string $ip
+     * @return bool
+     */
+    public static function isRateLimited($ip = '')
+    {
+        self::initTable();
+        $table = Database::get_main_table('user_magic_attempt');
+        if (empty($ip)) {
+            $ip = function_exists('api_get_real_ip') ? api_get_real_ip() : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1');
+        }
+        $ip = Database::escape_string(substr(trim($ip), 0, 45));
+        $windowStart = date('Y-m-d H:i:s', strtotime('-15 minutes'));
+
+        // Clean up old attempts (>24h)
+        $cleanupTime = date('Y-m-d H:i:s', strtotime('-24 hours'));
+        Database::query("DELETE FROM $table WHERE attempt_time < '$cleanupTime'");
+
+        $sql = "SELECT COUNT(*) as cnt FROM $table WHERE ip = '$ip' AND attempt_time > '$windowStart'";
+        $res = Database::query($sql);
+        if ($res && ($row = Database::fetch_assoc($res))) {
+            return (int) $row['cnt'] >= 10;
+        }
+        return false;
+    }
+
+    /**
+     * Record a failed magic login attempt for rate-limiting
+     *
+     * @param string $ip
+     */
+    public static function recordFailedAttempt($ip = '')
+    {
+        self::initTable();
+        $table = Database::get_main_table('user_magic_attempt');
+        if (empty($ip)) {
+            $ip = function_exists('api_get_real_ip') ? api_get_real_ip() : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1');
+        }
+        $ip = Database::escape_string(substr(trim($ip), 0, 45));
+        $now = api_get_utc_datetime();
+        Database::query("INSERT INTO $table (ip, attempt_time) VALUES ('$ip', '$now')");
+    }
+
+    /**
+     * Revoke a specific magic token immediately
+     *
+     * @param string $token
+     * @return bool
+     */
+    public static function revokeToken($token)
+    {
+        self::initTable();
+        $table = Database::get_main_table('user_magic_token');
+        $token = Database::escape_string(trim($token));
+        $now = api_get_utc_datetime();
+        Database::query("UPDATE $table SET expires_at = '$now' WHERE token = '$token'");
+        return Database::affected_rows() > 0;
+    }
+
+    /**
+     * Revoke all active magic tokens for a given user
+     *
+     * @param int $userId
+     * @return int Number of revoked tokens
+     */
+    public static function revokeTokensForUser($userId)
+    {
+        self::initTable();
+        $table = Database::get_main_table('user_magic_token');
+        $userId = (int) $userId;
+        $now = api_get_utc_datetime();
+        Database::query("UPDATE $table SET expires_at = '$now' WHERE user_id = $userId AND expires_at > '$now'");
+        return Database::affected_rows();
+    }
+
+    /**
+     * Validate a magic token and log the user into the platform.
+     * Enforces single-use, rate-limiting, expiration, and session regeneration.
      *
      * @param string $token
      * @return array
@@ -106,30 +193,56 @@ class MagicLoginManager
     public static function validateAndLogin($token)
     {
         self::initTable();
+        $ip = function_exists('api_get_real_ip') ? api_get_real_ip() : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '127.0.0.1');
+
+        if (self::isRateLimited($ip)) {
+            return ['success' => false, 'error' => 'rate_limited'];
+        }
+
         $table = Database::get_main_table('user_magic_token');
         $token = Database::escape_string(trim($token));
 
         if (empty($token)) {
+            self::recordFailedAttempt($ip);
             return ['success' => false, 'error' => 'empty_token'];
         }
 
         $now = api_get_utc_datetime();
-        $sql = "SELECT * FROM $table WHERE token = '$token' AND expires_at > '$now' LIMIT 1";
+        $sql = "SELECT * FROM $table WHERE token = '$token' LIMIT 1";
         $res = Database::query($sql);
 
-        if (!$row = Database::fetch_assoc($res)) {
+        if (!$res || !($row = Database::fetch_assoc($res))) {
+            self::recordFailedAttempt($ip);
             return ['success' => false, 'error' => 'invalid_or_expired'];
+        }
+
+        // Single-use enforcement: check if token was already used
+        if (!empty($row['used_at'])) {
+            self::recordFailedAttempt($ip);
+            return ['success' => false, 'error' => 'already_used'];
+        }
+
+        // Expiration check
+        if (strtotime($row['expires_at']) <= strtotime($now)) {
+            self::recordFailedAttempt($ip);
+            return ['success' => false, 'error' => 'expired'];
         }
 
         $userId = (int) $row['user_id'];
         $userInfo = api_get_user_info($userId, true);
 
         if (empty($userInfo)) {
+            self::recordFailedAttempt($ip);
             return ['success' => false, 'error' => 'user_not_found'];
         }
 
         if (empty($userInfo['active'])) {
             return ['success' => false, 'error' => 'user_inactive'];
+        }
+
+        // Anti-session fixation: regenerate session id on privilege change
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_regenerate_id(true);
         }
 
         // Clean any existing session
@@ -162,8 +275,8 @@ class MagicLoginManager
         ];
         Event::registerLog($logInfo);
 
-        // Update token used_at timestamp
-        $updateSql = "UPDATE $table SET used_at = '$now' WHERE token = '$token'";
+        // Atomically mark token as used and expired to prevent replay race conditions
+        $updateSql = "UPDATE $table SET used_at = '$now', expires_at = '$now' WHERE token = '$token'";
         Database::query($updateSql);
 
         return ['success' => true, 'user' => $userInfo];

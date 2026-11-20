@@ -180,7 +180,7 @@ Run the test suite from the repository root:
 ```bash
 php tests/run_test_suite.php
 ```
-All 121 tests must output `[PASS]`.
+All 135 tests must output `[PASS]`.
 
 ### Step 3: Run Development Server
 Start the built-in development server using `router.php`:

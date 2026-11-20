@@ -2,7 +2,7 @@ name: Sparky LMS Verification Suite
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, sprint-controlled-pilot ]
   pull_request:
     branches: [ main ]
 
@@ -31,3 +31,6 @@ jobs:
 
       - name: Run Sparky Automated Verification Suite
         run: php tests/run_test_suite.php
+
+      - name: Run Database Integrity & Schema Suite
+        run: php tests/test_database_backup_restore.php

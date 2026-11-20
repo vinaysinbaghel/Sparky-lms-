@@ -8468,6 +8468,27 @@ LOCK TABLES `user_magic_token` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `user_magic_attempt`
+--
+
+DROP TABLE IF EXISTS `user_magic_attempt`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_magic_attempt` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `ip` varchar(45) NOT NULL,
+  `attempt_time` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ip_attempt_time` (`ip`,`attempt_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+LOCK TABLES `user_magic_attempt` WRITE;
+/*!40000 ALTER TABLE `user_magic_attempt` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_magic_attempt` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `user_rel_course_vote`
 --
 

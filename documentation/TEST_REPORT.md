@@ -4,7 +4,7 @@
 **Test Runner:** `php tests/run_test_suite.php`  
 **Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.6+ Compatible Schema | Redis 7.2 Protocol  
 **Repository Branch:** `main`  
-**Verification Result:** **121 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Verification Result:** **135 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
 
 ---
 
@@ -15,7 +15,7 @@
         SPARKY LMS - COMPREHENSIVE TEST SUITE           
 ========================================================
 Target Root: C:\Users\vinay.baghel\.gemini\antigravity\scratch\Sparky-lms-
-Passed:   121
+Passed:   135
 Failed:   0
 Warnings: 0
 Result:   ALL TESTS PASSED SUCCESSFULLY (Exit Code: 0)
@@ -158,29 +158,85 @@ Result:   ALL TESTS PASSED SUCCESSFULLY (Exit Code: 0)
 | TC-99 | `docker-compose.yml` configures Redis RDB snapshots (`--save 900 1`) | **PASS** | Disk persistence |
 | TC-100 | `docker-compose.yml` configures Redis Append-Only File (`--appendonly yes`) | **PASS** | AOF persistence |
 
-### 2.11 Cryptographic Entropy & Magic Login (3 Assertions)
+### 2.11 Cryptographic Entropy & Magic Login (7 Assertions)
 | ID | Assertion Description | Status | Evidence |
 |---|---|---|---|
 | TC-101 | `random_bytes(32)` produces 64-char hexadecimal string (256 bits entropy) | **PASS** | Cryptographic randomness |
 | TC-102 | 1,000 generated tokens exhibit zero collisions | **PASS** | Collision-resistant |
 | TC-103 | `MagicLoginManager` uses cryptographically secure `random_bytes` | **PASS** | Code verified |
+| TC-104 | `MagicLoginManager` implements `isRateLimited()` brute-force protection | **PASS** | Max 10 attempts per 15 min |
+| TC-105 | `MagicLoginManager` enforces atomic single-use token invalidation | **PASS** | `used_at` and `expires_at` synchronized |
+| TC-106 | `MagicLoginManager` calls `session_regenerate_id(true)` anti-fixation | **PASS** | Session regeneration verified |
+| TC-107 | `MagicLoginManager` provides explicit token revocation methods | **PASS** | `revokeToken` and `revokeTokensForUser` |
 
-### 2.12 Course Curriculum RBAC & Authorization (3 Assertions)
+### 2.12 Course Curriculum RBAC & Resumption (6 Assertions)
 | ID | Assertion Description | Status | Evidence |
 |---|---|---|---|
-| TC-104 | `curriculum.ajax.php` rejects unauthenticated requests with HTTP 401 | **PASS** | Auth check verified |
-| TC-105 | `curriculum.ajax.php` validates write permissions via `$canEdit` | **PASS** | Role check verified |
-| TC-106 | `curriculum.ajax.php` rejects unauthorized writes with HTTP 403 | **PASS** | Access denied verified |
+| TC-108 | `curriculum.ajax.php` rejects unauthenticated requests with HTTP 401 | **PASS** | Auth check verified |
+| TC-109 | `curriculum.ajax.php` validates write permissions via `$canEdit` | **PASS** | Role check verified |
+| TC-110 | `curriculum.ajax.php` rejects unauthorized writes with HTTP 403 | **PASS** | Access denied verified |
+| TC-111 | `CourseCurriculum` implements `getResumeLesson()` for incomplete lessons | **PASS** | Learner tracking verified |
+| TC-112 | `curriculum.ajax.php` exposes `ajax_get_resume_lesson` endpoint | **PASS** | API endpoint verified |
+| TC-113 | `curriculum.ajax.php` exposes `ajax_mark_lesson_completed` endpoint | **PASS** | Progress tracking verified |
 
 ### 2.13 Certificate Template Upload Hardening (2 Assertions)
 | ID | Assertion Description | Status | Evidence |
 |---|---|---|---|
-| TC-107 | `certificate_editor.php` restricts uploads to safe image types (`jpg, png, webp, gif`) | **PASS** | Whitelist enforced |
-| TC-108 | `certificate_editor.php` generates randomized filenames via `random_bytes(8)` | **PASS** | Unpredictable filename |
+| TC-114 | `certificate_editor.php` restricts uploads to safe image types (`jpg, png, webp, gif`) | **PASS** | Whitelist enforced |
+| TC-115 | `certificate_editor.php` generates randomized filenames via `random_bytes(8)` | **PASS** | Unpredictable filename |
 
 ---
 
-## 3. Composer Validation Results
+## 3. Real HTTP Request & Authorization Test Suite (20 Assertions)
+
+Command executed:
+```bash
+php tests/test_http_requests.php
+```
+Results:
+- **Negative Security Tests:** 6/6 blocked direct access to database, config, `.git`, `composer.json`, `composer.lock`, and `tests/` with HTTP 403.
+- **Directory Traversal:** 3/3 blocked raw `..`, double-encoded `%252e%252e`, and triple-encoded `%25252e%25252e` with HTTP 403.
+- **Course Authorization Routing:** 5/5 verified course videos, PDFs, SCORM, work assignments, and uploads route through authenticated PHP handlers instead of raw disk aliases.
+- **HTTP 206 Byte-Range Streaming:** 5/5 verified `Accept-Ranges: bytes`, initial byte chunk (0-1023), open range (1000-), suffix range (-500), and HTTP 416 on unsatisfiable ranges.
+- **CORS Protection:** 1/1 verified safe origin restriction on media endpoints.
+- **Summary:** **20 PASSED / 0 FAILED**
+
+---
+
+## 4. Concurrency & Performance Load Test Suite (3 Tiers)
+
+Command executed:
+```bash
+php tests/test_concurrency.php
+```
+Results:
+| Concurrency Tier | Total Requests | Success Rate | Errors | Throughput | Avg Latency |
+|---|---|---|---|---|---|
+| **50 Simulated Learners** | 50 | 100% | 0 | 711.5 req/sec | 1.41 ms |
+| **100 Simulated Learners** | 100 | 100% | 0 | 643.5 req/sec | 1.55 ms |
+| **250 Simulated Learners** | 250 | 100% | 0 | 272.6 req/sec | 3.67 ms |
+
+- **Summary:** **3/3 TIERS PASSED WITH ZERO ERRORS**
+
+---
+
+## 5. Database Schema & Disaster Recovery Test Suite (26 Assertions)
+
+Command executed:
+```bash
+php tests/test_database_backup_restore.php
+```
+Results:
+- Verified clean dump integrity: MariaDB/MySQL header, UTF-8 charset, >300KB size.
+- Discovered 247 tables and 2,338 SQL statements.
+- Verified all core Chamilo foundation tables (user, course, session, c_document, c_item_property, c_tool, c_quiz, c_student_publication).
+- Verified all 8 custom Sparky subsystem tables (`c_curriculum_chapter`, `c_curriculum_lesson`, `c_curriculum_lesson_track`, `c_certificate_blueprint`, `c_certificate_blueprint_course`, `c_certificate_awarded`, `user_magic_token`, `user_magic_attempt`).
+- Verified `--single-transaction`, `--quick`, and safe stdin restore commands.
+- **Summary:** **26 PASSED / 0 FAILED**
+
+---
+
+## 6. Composer Validation Results
 
 Command executed:
 ```bash

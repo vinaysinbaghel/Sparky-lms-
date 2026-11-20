@@ -26,7 +26,14 @@ if ($result['success']) {
 } else {
     $errCode = $result['error'] ?? 'unknown';
     $msg = 'This login link is invalid or has expired.';
-    if ($errCode === 'user_inactive') {
+    if ($errCode === 'rate_limited') {
+        http_response_code(429);
+        $msg = 'Too many failed login attempts. Please wait 15 minutes before trying again.';
+    } elseif ($errCode === 'already_used') {
+        $msg = 'This magic login link has already been used and cannot be reused. Please request a new link.';
+    } elseif ($errCode === 'expired') {
+        $msg = 'This magic login link has expired. Please request a new link from your administrator.';
+    } elseif ($errCode === 'user_inactive') {
         $msg = 'This user account is currently deactivated. Please contact support.';
     } elseif ($errCode === 'user_not_found') {
         $msg = 'The account associated with this link was not found.';
@@ -42,7 +49,7 @@ function displayError($message) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Login Link Expired - Chamilo</title>
+        <title>Login Link - Sparky LMS</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; }
