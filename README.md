@@ -497,107 +497,99 @@ Certbot will configure TLS 1.3 encryption and automatic certificate renewals.
 
 ## 4. Docker & Docker Compose Deployment
 
-For containerized environments (AWS ECS, Google Cloud Run, DigitalOcean, self-hosted Docker), a turnkey `docker-compose.yml` and `Dockerfile` are provided in the repository root:
+For containerized hosting (AWS, Google Cloud, DigitalOcean, or private VPS), Sparky LMS provides a hardened, multi-container production stack defined in [`docker-compose.yml`](docker-compose.yml).
 
-```yaml
-version: '3.8'
+### Architecture & Service Inventory
 
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: sparky_app
-    restart: unless-stopped
-    volumes:
-      - .:/var/www/sparky-lms
-    environment:
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-sparky_lms}
-      DB_USER: ${DB_USER:-sparky_user}
-      DB_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD must be set in .env file}
-      APP_HOST: ${APP_HOST:-localhost}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+| Container | Image / Dockerfile | Role & Security Isolation |
+|---|---|---|
+| **`app`** | [`Dockerfile`](Dockerfile) (PHP 8.3-FPM) | Runs application backend. Source files are read-only (`root:root`, 755/644). Writable access is strictly isolated to named volumes for cache, uploads, logs, and courses. |
+| **`web`** | [`docker/Dockerfile.nginx`](docker/Dockerfile.nginx) | Custom Nginx gateway containing identical read-only application release assets. Enforces TLS/HTTPS redirection, course media authorization handlers, and blocking of raw storage. |
+| **`db`** | `mariadb:11.4` | Dedicated MariaDB database with automated initialization via `database/sparky_clean_database.sql`. Persistent storage in `mariadb_data`. |
+| **`redis`** | `redis:7-alpine` | In-memory session and cache store with `noeviction` policy, RDB snapshots, AOF persistence, and password authentication. Persistent storage in `redis_data`. |
 
-  web:
-    image: nginx:alpine
-    container_name: sparky_web
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - .:/var/www/sparky-lms:ro
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/sparky-routes.inc:/etc/nginx/conf.d/sparky-routes.inc:ro
-      - ./docker/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - app
+### Step 1: Pre-Launch Certificate Generation
+The Nginx container requires valid SSL certificates at `/etc/nginx/ssl/` and will refuse to start if they are missing or empty.
 
-  db:
-    image: mariadb:11.4
-    container_name: sparky_db
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Error: MYSQL_ROOT_PASSWORD must be set in .env file}
-      MYSQL_DATABASE: ${DB_NAME:-sparky_lms}
-      MYSQL_USER: ${DB_USER:-sparky_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Error: DB_PASSWORD must be set in .env file}
-    volumes:
-      - mariadb_data:/var/lib/mysql
-      - ./database/sparky_clean_database.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+```bash
+# For local testing / development (generates self-signed certificates in docker/ssl/):
+# On Linux / macOS:
+bash docker/ssl/generate-certs.sh
 
-  redis:
-    image: redis:7-alpine
-    container_name: sparky_redis
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in .env file}
-      --maxmemory 512mb
-      --maxmemory-policy noeviction
-      --save 900 1
-      --save 300 10
-      --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  mariadb_data:
-  redis_data:
+# On Windows:
+docker\ssl\generate-certs.bat
 ```
 
-### Setup & Launch
-1. Copy the environment file template and configure strong secrets:
+> **Production Note:** For production deployments with public domain names, mount valid CA-signed certificates (such as Let's Encrypt) directly into `docker/ssl/cert.pem` and `docker/ssl/key.pem` before starting.
+
+### Step 2: Configure Mandatory Secrets in `.env`
+Copy `.env.example` to `.env` and generate unique, cryptographically random secrets:
+
 ```bash
 cp .env.example .env
-# Edit .env and set strong passwords for DB_PASSWORD, MYSQL_ROOT_PASSWORD, and REDIS_PASSWORD
 ```
-2. Launch the cluster:
+
+Generate values for all 4 mandatory secrets (Docker will reject empty values or known placeholders):
 ```bash
-docker compose up -d
+# 1. Generate database and Redis passwords (minimum 16 characters):
+openssl rand -base64 24
+
+# 2. Generate application signing key (minimum 32 characters, 64-char hex recommended):
+openssl rand -hex 32
 ```
-3. Access Sparky LMS at `http://localhost` (HTTP) or `https://localhost` (HTTPS with self-signed SSL). For production certificates, mount your Let's Encrypt certificates into `docker/ssl/`.
+
+Populate `.env`:
+```env
+APP_HOST=learn.yourdomain.com
+DB_NAME=sparky_lms
+DB_USER=sparky_user
+DB_PASSWORD=<generated_db_password>
+MYSQL_ROOT_PASSWORD=<generated_root_password>
+REDIS_PASSWORD=<generated_redis_password>
+SECURITY_KEY=<generated_64_char_hex_key>
+```
+
+### Step 3: Launch Cluster
+```bash
+# Production mode (isolated named volumes, read-only images):
+docker compose up -d --build
+
+# Check container health status:
+docker compose ps
+```
+
+All 4 containers (`sparky_app`, `sparky_web`, `sparky_db`, `sparky_redis`) will report `healthy`.
+
+### Step 4: Persistent Volumes & Disaster Recovery
+User data, course materials, sessions, and databases are stored in isolated Docker named volumes outside container lifecycles:
+
+| Volume Name | Mount Path | Purpose | Backup Command |
+|---|---|---|---|
+| `sparky_courses` | `/var/www/sparky-lms/app/courses` | Uploaded course documents & SCORM packages | `docker run --rm -v sparky_courses:/data -v $(pwd):/backup alpine tar czf /backup/courses.tar.gz -C /data .` |
+| `sparky_upload` | `/var/www/sparky-lms/app/upload` | Learner submissions, curriculum media | `docker run --rm -v sparky_upload:/data -v $(pwd):/backup alpine tar czf /backup/upload.tar.gz -C /data .` |
+| `mariadb_data` | `/var/lib/mysql` | Complete MariaDB relational database | `docker compose exec db mariadb-dump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction --quick sparky_lms > backup_$(date +%F).sql` |
+| `redis_data` | `/data` | Redis AOF & RDB persistent session data | Backed up automatically via `appendonly.aof` and `dump.rdb` |
+
+### Step 5: Application Upgrades Without Data Loss
+To upgrade Sparky LMS to a new release without losing learner enrollments, submissions, or course materials:
+
+```bash
+# 1. Pull the latest release
+git pull origin main
+
+# 2. Rebuild the immutable application and web images
+docker compose build
+
+# 3. Recreate containers with zero storage loss (named volumes are preserved)
+docker compose up -d
+
+# 4. Run automated verification suite inside the running container
+docker compose exec app php tests/run_test_suite.php
+```
+
+### Local Development vs. Production Deployment
+* **Production (`docker compose up -d --build`):** Uses immutable, self-contained `sparky_web` and `sparky_app` container images with `root:root` read-only source files. Host source files are not exposed to the container.
+* **Local Development (`docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`):** Mounts the host workspace directly at `.:/var/www/sparky-lms:ro` for Nginx and read-write for developer convenience, allowing immediate code and asset editing without rebuilding.
 
 ---
 
@@ -671,10 +663,10 @@ HTML5 video players require standard HTTP 206 Partial Content (Byte-Range) respo
 
 ## 9. Automated Verification & Testing
 
-Sparky LMS includes 5 dedicated automated test suites covering 263 total assertions with zero failures across static architecture, real HTTP authorization, database schema, concurrency, and real MariaDB/Redis integration:
+Sparky LMS includes 5 dedicated automated test suites covering 276 total assertions with zero failures across static architecture, real HTTP authorization, database schema, authenticated multi-learner concurrency, and real MariaDB/Redis integration:
 
 ```bash
-# 1. Comprehensive Static & Architecture Verification (146 assertions)
+# 1. Comprehensive Static & Architecture Verification (154 assertions)
 php tests/run_test_suite.php
 
 # 2. Database Backup & Schema Integrity Suite (26 assertions)
@@ -683,10 +675,10 @@ php tests/test_database_backup_restore.php
 # 3. Real HTTP Requests & Media Streaming Suite (25 assertions)
 php tests/test_http_requests.php
 
-# 4. Concurrency & Performance Load Suite (50, 100, 250 learners)
+# 4. Authenticated Multi-Learner Load Suite (4 cohorts, 740 operations)
 php tests/test_concurrency.php
 
-# 5. Full System Integration Suite (MariaDB & Redis, 63 assertions)
+# 5. Full System Integration Suite (MariaDB & Redis, 71 assertions)
 php tests/test_integration.php
 ```
 
@@ -868,24 +860,24 @@ Expected output of `php tests/run_test_suite.php`:
   [PASS] certificate_editor.php generates cryptographically randomized background filenames
 
 ========================================================
-PASSED:   146
+PASSED:   154
 FAILED:   0
 WARNINGS: 0
 ========================================================
 ALL TESTS PASSED SUCCESSFULLY.
-```
 ```
 
 ---
 
 ## 10. Documentation Index
 
-Comprehensive engineering and security documentation is available in the [`documentation/`](documentation/) directory:
+Comprehensive engineering, security, and benchmark documentation is available in the [`documentation/`](documentation/) directory:
 
 - 📘 [Engineering Audit & Architecture Inventory](documentation/ENGINEERING_AUDIT.md) — Comprehensive breakdown of core Chamilo foundation vs. custom Sparky subsystems.
 - 🛡️ [Security Audit & Vulnerability Remediation](documentation/SECURITY_AUDIT.md) — Analysis of threats, remediation implementations, and secret scanning resolution.
 - 🚀 [Production & Local Deployment Guide](documentation/DEPLOYMENT_GUIDE.md) — Verified setup instructions for Docker Compose, Ubuntu/Debian Linux, and local Windows development.
-- 🧪 [Automated Verification & Test Report](documentation/TEST_REPORT.md) — Detailed results of the 135-assertion automated verification suite across all 13 categories.
+- 🧪 [Automated Verification & Test Report](documentation/TEST_REPORT.md) — Detailed results of the 276-assertion automated verification suite across all test suites.
+- 📊 [Authenticated Multi-Learner Load Test Report](documentation/LOAD_TEST_REPORT.md) — Detailed throughput, latency percentiles (p50-p99), and error rates under concurrent learner workflows.
 - 📋 [Release Changelog & Pilot Readiness](documentation/RELEASE_CHANGELOG.md) — Sprint changelog, resolved blockers, and controlled pilot deployment checklist.
 - 🧭 [Controlled Pilot Walkthrough & UI Guide](documentation/PILOT_WALKTHROUGH.md) — Comprehensive journey walkthroughs for Admin, Instructor, and Student.
 

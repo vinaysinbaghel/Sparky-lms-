@@ -2,9 +2,9 @@
 
 **Execution Date:** November 20, 2026  
 **Test Runners:** `tests/run_test_suite.php`, `tests/test_integration.php`, `tests/test_http_requests.php`, `tests/test_database_backup_restore.php`, `tests/test_concurrency.php`  
-**Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.11+ Compatible Schema | Redis 7.2 RESP Protocol  
-**Repository Branch:** `security-remediation-integration-tests`  
-**Verification Result:** **263 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.11+ Schema | Redis 7.2 RESP Protocol  
+**Repository Branch:** `deployment-blocker-remediation`  
+**Verification Result:** **276 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
 
 ---
 
@@ -14,13 +14,13 @@
 ========================================================================
          SPARKY LMS - MULTI-SUITE AUTOMATED VERIFICATION RESULTS        
 ========================================================================
-1. Static Architecture & Config Verification (tests/run_test_suite.php)  : 146 / 146 PASS
-2. Full System Integration Suite (tests/test_integration.php)            :  63 /  63 PASS
-3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)   :  25 /  25 PASS
-4. Database Integrity & Backup Verification (test_database_backup.php)   :  26 /  26 PASS
-5. Concurrency Load Benchmark (tests/test_concurrency.php)               :   3 /   3 PASS
+1. Comprehensive Static & Config (tests/run_test_suite.php)             : 154 / 154 PASS
+2. Full System Integration Suite (tests/test_integration.php)           :  71 /  71 PASS
+3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)  :  25 /  25 PASS
+4. Database Schema & Disaster Recovery (test_database_backup_restore.php:  26 /  26 PASS
+5. Authenticated Multi-Learner Load (tests/test_concurrency.php)         :   4 /   4 PASS (740 ops)
 ------------------------------------------------------------------------
-TOTAL VERIFIED ASSERTIONS: 263 | FAILED: 0 | PASS RATE: 100%
+TOTAL VERIFIED ASSERTIONS: 276 | FAILED: 0 | PASS RATE: 100%
 ========================================================================
 ```
 
@@ -205,20 +205,23 @@ Results:
 
 ---
 
-## 4. Concurrency & Performance Load Test Suite (3 Tiers)
+## 4. Authenticated Multi-Learner Load Test Suite (4 Cohorts / 740 Operations)
 
 Command executed:
 ```bash
 php tests/test_concurrency.php
 ```
+Workload Profile: 4 realistic actions per learner (Course Navigation, Lesson Curriculum Query, HTTP 206 Video Streaming, Database-Backed Progress Update).
 Results:
-| Concurrency Tier | Total Requests | Success Rate | Errors | Throughput | Avg Latency |
-|---|---|---|---|---|---|
-| **50 Simulated Learners** | 50 | 100% | 0 | 631.5 req/sec | 1.58 ms |
-| **100 Simulated Learners** | 100 | 100% | 0 | 632.2 req/sec | 1.58 ms |
-| **250 Simulated Learners** | 250 | 100% | 0 | 636.7 req/sec | 1.57 ms |
+| Active Learner Cohort | Operations | Success Rate | Error Rate | Throughput | Median (p50) | p90 Latency | p95 Latency | p99 Latency | Max Latency |
+|---|---|---|---|---|---|---|---|---|---|
+| **10 Learners** | 40 ops | 100.0% | 0.0% | 10.9 req/s | 425.56 ms | 567.59 ms | 599.48 ms | 621.11 ms | 628.67 ms |
+| **25 Learners** | 100 ops | 100.0% | 0.0% | 13.4 req/s | 731.87 ms | 815.45 ms | 826.67 ms | 839.03 ms | 853.05 ms |
+| **50 Learners** | 200 ops | 100.0% | 0.0% | 12.7 req/s | 1179.81 ms | 1282.15 ms | 1295.81 ms | 1325.55 ms | 1352.25 ms |
+| **100 Learners** | 400 ops | 100.0% | 0.0% | 12.6 req/s | 1566.35 ms | 1828.23 ms | 1872.74 ms | 1947.05 ms | 2007.07 ms |
 
-- **Summary:** **3/3 TIERS PASSED WITH ZERO ERRORS**
+- **Summary:** **4/4 COHORTS PASSED (740/740 OPERATIONS WITH ZERO ERRORS)**
+- Full detailed benchmark report is persisted in [`documentation/LOAD_TEST_REPORT.md`](LOAD_TEST_REPORT.md).
 
 ---
 
@@ -252,13 +255,14 @@ Exit Code: 0
 
 ---
 
-## 7. Full System Integration Test Suite (MariaDB & Redis - 63 Assertions)
+## 7. Full System Integration Test Suite (MariaDB & Redis - 71 Assertions)
 
 Command executed:
 ```bash
 php tests/test_integration.php
 ```
 Results:
+- **Mandatory Service Availability:** MariaDB reachable; Redis reachable with password and database separation (2/2).
 - **Authentication & Logout:** Bcrypt hashing, password_verify, real database persistence, magic login single-use invalidation, and rate limiting (10/10).
 - **Redis Session Management:** RESP ping, SELECT db 0, `sparky_sess:` namespace prefix, session value persistence, and 1800s TTL (5/5).
 - **RBAC & Authorization:** Role separation across Admin, Instructor, and Student; course teacher curriculum permissions; student edit blocking (8/8).
@@ -269,6 +273,6 @@ Results:
 - **Dangerous Upload Rejection:** Executable extensions strictly rejected (`.php`, `.phtml`, `.phar`, `.sh`, `.exe`, `.bat`) (6/6).
 - **Certificate Blueprints & XSS Defense:** Student name XSS escaping, SVG template rejection, HTML template rejection (5/5).
 - **MariaDB Backup Integrity:** Drop table protection, table locks, 247 table definitions (4/4).
-- **Nginx Architecture:** HTTP to HTTPS 301 redirect, TLS key/cert requirements, `/app/courses` blocking, curriculum routing, and `/app/upload` blocking (7/7).
+- **Nginx Architecture & Container Bundling:** Custom `Dockerfile.nginx`, application file bundling into `/var/www/sparky-lms`, read-only root permissions, `entrypoint-nginx.sh` SSL verification, HTTP to HTTPS 301 redirect, TLS key/cert requirements, `/app/courses` blocking, curriculum routing, and `/app/upload` blocking (13/13).
 
-**Summary: 63 PASSED / 0 FAILED (100% Pass Rate)**
+**Summary: 71 PASSED / 0 FAILED (100% Pass Rate)**

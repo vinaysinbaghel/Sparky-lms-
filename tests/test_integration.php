@@ -154,6 +154,24 @@ register_shutdown_function(function() use (&$mariadbProcess, &$redisProcess, &$t
 });
 
 // Setup test database schema
+assertIntegration("MariaDB relational database service reachable and connected", $dbConnected, "MariaDB service could not be contacted on {$dbHost}:{$dbPort}");
+if (!$dbConnected || !$pdo) {
+    echo "\n[CRITICAL FAILURE] MariaDB service is required for integration tests. Exiting.\n";
+    exit(1);
+}
+
+// Verify Redis service connectivity
+$redisCheck = @stream_socket_client("tcp://{$redisHost}:{$redisPort}", $errno, $errstr, 2);
+$redisConnected = is_resource($redisCheck);
+if ($redisConnected) {
+    fclose($redisCheck);
+}
+assertIntegration("Redis in-memory caching and session service reachable and connected", $redisConnected, "Redis service could not be contacted on {$redisHost}:{$redisPort}");
+if (!$redisConnected) {
+    echo "\n[CRITICAL FAILURE] Redis service is required for integration tests. Exiting.\n";
+    exit(1);
+}
+
 if ($dbConnected && $pdo) {
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `{$dbName}`");
@@ -523,7 +541,18 @@ echo "\n--- 11. Nginx Security Architecture & Container Routing ---\n";
 $routesInc = file_get_contents($rootDir . '/docker/sparky-routes.inc');
 $nginxConf = file_get_contents($rootDir . '/docker/nginx.conf');
 $sampleConf = file_get_contents($rootDir . '/nginx.conf.sample');
+$composeYml = file_get_contents($rootDir . '/docker-compose.yml');
 
+assertIntegration("docker/Dockerfile.nginx exists", file_exists($rootDir . '/docker/Dockerfile.nginx'));
+$nginxDockerContent = file_get_contents($rootDir . '/docker/Dockerfile.nginx');
+assertIntegration("docker/Dockerfile.nginx copies application tree to Nginx root", strpos($nginxDockerContent, 'COPY . /var/www/sparky-lms') !== false);
+assertIntegration("docker/Dockerfile.nginx sets read-only permissions (root:root)", strpos($nginxDockerContent, 'chown -R root:root /var/www/sparky-lms') !== false);
+
+assertIntegration("docker/entrypoint-nginx.sh exists", file_exists($rootDir . '/docker/entrypoint-nginx.sh'));
+$nginxEntryContent = file_get_contents($rootDir . '/docker/entrypoint-nginx.sh');
+assertIntegration("docker/entrypoint-nginx.sh validates SSL cert existence", strpos($nginxEntryContent, 'TLS/SSL certificate or private key missing') !== false);
+
+assertIntegration("docker-compose.yml web service builds custom Dockerfile.nginx", strpos($composeYml, 'dockerfile: docker/Dockerfile.nginx') !== false);
 assertIntegration("Nginx port 80 issues 301 HTTPS redirect", strpos($nginxConf, 'return 301 https://$host$request_uri;') !== false);
 assertIntegration("Nginx TLS configuration enforces cert & key mounts", strpos($nginxConf, '/etc/nginx/ssl/cert.pem') !== false);
 assertIntegration("Nginx blocks direct access to app/courses", strpos($routesInc, 'app/courses') !== false);

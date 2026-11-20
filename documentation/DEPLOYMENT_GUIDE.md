@@ -37,7 +37,16 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Ensure the following mandatory keys are defined in `.env`:
+Ensure the following mandatory keys are defined in `.env`. Generate cryptographically secure random values for all secrets (empty values and placeholders are rejected):
+```bash
+# Generate database and Redis passwords (minimum 16 chars):
+openssl rand -base64 24
+
+# Generate application signing key (64 hex characters):
+openssl rand -hex 32
+```
+
+Sample `.env` structure:
 ```env
 APP_ENV=production
 APP_HOST=lms.yourdomain.com
@@ -47,21 +56,16 @@ DB_HOST=db
 DB_PORT=3306
 DB_NAME=sparky_lms
 DB_USER=sparky_user
-DB_PASSWORD=YourStrongDatabasePassword2026!
-MYSQL_ROOT_PASSWORD=YourStrongRootPassword2026!
+DB_PASSWORD=<generated_secure_database_password>
+MYSQL_ROOT_PASSWORD=<generated_secure_root_password>
 
 REDIS_HOST=redis
 REDIS_PORT=6379
-REDIS_PASSWORD=YourStrongRedisPassword2026!
+REDIS_PASSWORD=<generated_secure_redis_password>
 REDIS_SESSION_DB=0
 REDIS_CACHE_DB=1
 
-SECURITY_KEY=GenerateWithOpenSSL_openssl_rand_-hex_32
-```
-
-Generate a cryptographically secure 64-character hex `SECURITY_KEY`:
-```bash
-openssl rand -hex 32
+SECURITY_KEY=<generated_64_char_hex_key>
 ```
 
 ### Step 3: SSL Certificates
@@ -92,6 +96,41 @@ docker compose ps
 ```
 Run the automated verification suite inside the container:
 ```bash
+docker compose exec app php tests/run_test_suite.php
+```
+
+### Step 6: Persistent Volumes & Disaster Recovery
+Production state is partitioned across persistent named volumes:
+* `sparky_courses`: Course documents, videos, and SCORM packages (`/var/www/sparky-lms/app/courses`).
+* `sparky_upload`: Learner assignments, submissions, and avatars (`/var/www/sparky-lms/app/upload`).
+* `sparky_logs`: Application and audit logs (`/var/www/sparky-lms/app/logs`).
+* `mariadb_data`: MariaDB relational database records (`/var/lib/mysql`).
+* `redis_data`: Redis persistent AOF logs and RDB snapshots (`/data`).
+
+To backup database state:
+```bash
+docker compose exec db mariadb-dump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction --quick sparky_lms > backup_$(date +%F).sql
+```
+
+To backup course and upload storage:
+```bash
+docker run --rm -v sparky_courses:/data -v $(pwd):/backup alpine tar czf /backup/courses_$(date +%F).tar.gz -C /data .
+docker run --rm -v sparky_upload:/data -v $(pwd):/backup alpine tar czf /backup/upload_$(date +%F).tar.gz -C /data .
+```
+
+### Step 7: Application Upgrade Without Data Loss
+To update the application codebase without impacting database records or learner files:
+```bash
+# 1. Pull the new version
+git pull origin main
+
+# 2. Rebuild the immutable images
+docker compose build
+
+# 3. Restart the containers with preserved volumes
+docker compose up -d
+
+# 4. Verify system health
 docker compose exec app php tests/run_test_suite.php
 ```
 

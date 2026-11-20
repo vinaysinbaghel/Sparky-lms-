@@ -34,7 +34,9 @@ services:
         condition: service_healthy
 
   web:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx
     container_name: sparky_web
     restart: unless-stopped
     ports:
@@ -43,8 +45,6 @@ services:
     volumes:
       - sparky_courses:/var/www/sparky-lms/app/courses:ro
       - sparky_upload:/var/www/sparky-lms/app/upload:ro
-      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./docker/sparky-routes.inc:/etc/nginx/conf.d/sparky-routes.inc:ro
       - ./docker/ssl:/etc/nginx/ssl:ro
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q --no-check-certificate https://localhost/ || wget --spider -q http://localhost/ || exit 1"]

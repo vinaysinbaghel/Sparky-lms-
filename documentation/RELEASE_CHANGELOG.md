@@ -118,22 +118,44 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 - **User Storage:** Personal files route exclusively through `download_my_files.php`.
 
 ### 6.5 Full System Integration Test Suite (`tests/test_integration.php`)
-- **Execution:** 63 assertions executed against disposable MariaDB (port 3308) and Redis RESP service (port 6389):
-  1. Real authentication, bcrypt verification, and session logout.
-  2. Redis RESP session persistence, SELECT db 0, prefix `sparky_sess:`, and 1800s TTL.
-  3. RBAC authorization (Admin, Instructor, Student boundaries).
-  4. Course enrolment & cross-student authorization.
-  5. Private user storage isolation (cross-user download blocked).
-  6. SCORM package authorization.
-  7. Video HTTP 206 partial content range requests.
-  8. Dangerous upload rejection (`.php`, `.phar`, `.sh`, `.exe`, `.bat`).
-  9. Certificate blueprints & XSS sanitization.
-  10. Real MariaDB backup and restoration verification.
-  11. Nginx container routing and security configuration.
+- **Execution:** 71 assertions executed against MariaDB and Redis:
+  1. Strict service availability checks: fails immediately if MariaDB or Redis is unavailable (no false passes).
+  2. Real authentication, bcrypt verification, and session logout.
+  3. Redis RESP session persistence, SELECT db 0, prefix `sparky_sess:`, and 1800s TTL.
+  4. RBAC authorization (Admin, Instructor, Student boundaries).
+  5. Course enrolment & cross-student authorization.
+  6. Private user storage isolation (cross-user download blocked).
+  7. SCORM package authorization.
+  8. Video HTTP 206 partial content range requests.
+  9. Dangerous upload rejection (`.php`, `.phar`, `.sh`, `.exe`, `.bat`).
+  10. Certificate blueprints & XSS sanitization.
+  11. Real MariaDB backup and restoration verification.
+  12. Custom Nginx image bundling, entrypoint SSL validation, and routing.
 
 ---
 
-## 7. GitHub Secret Scanning Resolution
+## 7. Sprint 7: Final Deployment Blocker Remediation
+
+### 7.1 Custom Nginx Gateway Image & Application Source Bundling
+- **Blocker:** Generic `nginx:alpine` lacked application files at `/var/www/sparky-lms`, causing 404 errors on static assets and PHP entrypoints.
+- **Resolution:** Created `docker/Dockerfile.nginx` bundling identical release application files into `/var/www/sparky-lms` with immutable read-only permissions (`root:root`, 755/644).
+- **Compose Update:** Configured `docker-compose.yml` to build `docker/Dockerfile.nginx` and mount courses and uploads as read-only (`:ro`).
+
+### 7.2 SSL First-Run Deployment & Entrypoint Guard
+- **Blocker:** Missing certificates caused Nginx container to crash silently or fail without an actionable explanation.
+- **Resolution:** Implemented `docker/entrypoint-nginx.sh` which validates the existence and non-zero size of `/etc/nginx/ssl/cert.pem` and `/etc/nginx/ssl/key.pem`. If missing, it outputs an explicit troubleshooting guide for generating local development certs or mounting CA-signed production certs, then halts with exit code 1.
+
+### 7.3 Mandatory Secret Enforcement & Insecure Placeholder Rejection
+- **Hardening:** Completely wiped all fixed example passwords (`ChangeMe_...`) from `.env.example`.
+- **Validation:** Updated `docker/entrypoint.sh` and `app/config/configuration.php.dist` to validate secret length and reject known insecure placeholders (`changeme`, `replace_with`, `password`, `testpass`, etc.) with HTTP 500 without leaking secrets.
+
+### 7.4 Authenticated Multi-Learner Concurrency & Load Benchmark
+- **Realism:** Replaced static JSON test in `tests/test_concurrency.php` with a multi-step authenticated student workflow (course navigation, lesson data query, HTTP 206 video range seeking, database-backed progress updates).
+- **Metrics:** Recorded 740 operations across 4 cohorts (10, 25, 50, 100 learners) with 100% success rate, 0% errors, throughput, and detailed latency percentiles (min, p50, p90, p95, p99, max).
+
+---
+
+## 8. GitHub Secret Scanning Resolution
 
 - **Alert:** Leaked Stripe Test API Secret Key (`sk_test_***`).
 - **Root Cause:** Historical upstream commit `98d882c6f7` contained an example test key in `plugin/buycourses/gateways/stripe-php/README.md`.
@@ -142,14 +164,16 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 
 ---
 
-## 8. Pilot Readiness Verdict
+## 9. Pilot Readiness Verdict
 
 | Criterion | Target | Status | Notes |
 |---|---|---|---|
-| **Security Hardening** | P0 vulnerabilities resolved | **READY** | Private keys untracked, mandatory `SECURITY_KEY`, read-only source |
+| **Nginx Source Access** | Same release bundled | **READY** | Built into custom `docker/Dockerfile.nginx` (read-only `root:root`) |
+| **SSL First-Run** | Guarded entrypoint | **READY** | Fails with explicit error if certs missing; local cert generator provided |
+| **Mandatory Secrets** | Unique, no placeholders | **READY** | Empty `.env.example`, placeholder rejection in entrypoint & config |
 | **Storage Authorization** | Zero unauthenticated downloads | **READY** | `/courses` and `/app/upload` strictly protected via PHP handlers |
-| **Reproducibility** | One-command Docker startup | **READY** | `docker compose up -d` with healthchecks |
+| **Reproducibility** | Turnkey Docker startup | **READY** | `docker compose up -d --build` with healthchecks |
 | **PHP 8.3 Support** | Native compatibility | **READY** | Validated on PHP 8.1, 8.2, and 8.3 |
-| **Automated Verification** | Full test coverage | **READY** | **263 total assertions** across 5 test suites |
-| **Performance** | >= 100 concurrent learners | **READY** | Verified up to 250 concurrent learners |
-| **Controlled Pilot Recommendation** | GO | **READY** | Recommended for controlled pilot launch |
+| **Automated Verification** | Full test coverage | **READY** | **276 total assertions** across 5 test suites |
+| **Learner Load Benchmark** | Authenticated workflows | **READY** | 740 ops tested up to 100 simultaneous learners (0% errors) |
+| **Controlled Pilot Recommendation** | GO | **READY** | All blockers resolved; ready for controlled pilot |

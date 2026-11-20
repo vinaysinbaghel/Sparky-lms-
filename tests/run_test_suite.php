@@ -86,7 +86,7 @@ assertTest("docker-compose.yml mandates DB_PASSWORD via :? error syntax", strpos
 assertTest("docker-compose.yml mandates MYSQL_ROOT_PASSWORD via :? error syntax", strpos($dockerComposeContent, 'MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?') !== false);
 assertTest("docker-compose.yml mandates REDIS_PASSWORD via :? error syntax", strpos($dockerComposeContent, 'REDIS_PASSWORD: ${REDIS_PASSWORD:?') !== false);
 assertTest("docker-compose.yml mounts SSL certificates directory", strpos($dockerComposeContent, './docker/ssl:/etc/nginx/ssl:ro') !== false);
-assertTest("docker-compose.yml mounts sparky routes include", strpos($dockerComposeContent, './docker/sparky-routes.inc:/etc/nginx/conf.d/sparky-routes.inc:ro') !== false);
+assertTest("docker/Dockerfile.nginx bundles sparky routes include", strpos(file_get_contents($rootDir . '/docker/Dockerfile.nginx'), 'COPY docker/sparky-routes.inc') !== false);
 
 assertTest(".env.example exists", file_exists($rootDir . '/.env.example'));
 $envExampleContent = file_get_contents($rootDir . '/.env.example');
@@ -94,11 +94,13 @@ assertTest(".env.example documents DB_PASSWORD", strpos($envExampleContent, 'DB_
 assertTest(".env.example documents MYSQL_ROOT_PASSWORD", strpos($envExampleContent, 'MYSQL_ROOT_PASSWORD') !== false);
 assertTest(".env.example documents REDIS_PASSWORD", strpos($envExampleContent, 'REDIS_PASSWORD') !== false);
 assertTest(".env.example documents SECURITY_KEY", strpos($envExampleContent, 'SECURITY_KEY') !== false);
+assertTest(".env.example contains ZERO hardcoded fallback passwords", strpos($envExampleContent, 'ChangeMe_') === false && strpos($envExampleContent, 'replace_with_') === false);
 assertTest("docker-compose.yml mandates SECURITY_KEY via :? error syntax", strpos($dockerComposeContent, 'SECURITY_KEY: ${SECURITY_KEY:?') !== false);
 
 $configDistContent = file_get_contents($rootDir . '/app/config/configuration.php.dist');
-assertTest("app/config/configuration.php.dist has NO hardcoded fallback security key", strpos($configDistContent, 'sparky_prod_sec_key_ChangeThisInProduction!') === false);
+assertTest("app/config/configuration.php.dist has NO hardcoded fallback assignment", strpos($configDistContent, "['security_key'] = 'sparky_prod_sec_key") === false);
 assertTest("app/config/configuration.php.dist validates SECURITY_KEY length >= 32", strpos($configDistContent, 'strlen(trim($envSecurityKey)) < 32') !== false);
+assertTest("app/config/configuration.php.dist validates against known placeholder strings", strpos($configDistContent, '$insecurePlaceholders') !== false);
 
 $gitignoreContent = file_get_contents($rootDir . '/.gitignore');
 assertTest(".gitignore ignores .env", strpos($gitignoreContent, ".env\n") !== false || strpos($gitignoreContent, ".env\r\n") !== false);
@@ -112,11 +114,19 @@ assertTest("Dockerfile sets up entrypoint script", strpos($dockerfileContent, 'E
 assertTest("Dockerfile configures read-only application source code (root:root)", strpos($dockerfileContent, 'chown -R root:root /var/www/sparky-lms') !== false);
 assertTest("Dockerfile restricts write permissions strictly to mutable storage directories", strpos($dockerfileContent, 'chown -R www-data:www-data /var/www/sparky-lms/app/cache') !== false);
 
+assertTest("docker/Dockerfile.nginx exists", file_exists($rootDir . '/docker/Dockerfile.nginx'));
+$dockerNginxFileContent = file_get_contents($rootDir . '/docker/Dockerfile.nginx');
+assertTest("docker/Dockerfile.nginx bundles read-only application files into Nginx", strpos($dockerNginxFileContent, 'COPY . /var/www/sparky-lms') !== false);
+assertTest("docker/Dockerfile.nginx configures entrypoint-nginx.sh", strpos($dockerNginxFileContent, 'ENTRYPOINT ["/usr/local/bin/entrypoint-nginx.sh"]') !== false);
+
+assertTest("docker/entrypoint-nginx.sh exists and validates SSL certs", file_exists($rootDir . '/docker/entrypoint-nginx.sh') && strpos(file_get_contents($rootDir . '/docker/entrypoint-nginx.sh'), 'TLS/SSL certificate or private key missing') !== false);
+
 assertTest("docker/entrypoint.sh exists", file_exists($rootDir . '/docker/entrypoint.sh'));
 $entrypointContent = file_get_contents($rootDir . '/docker/entrypoint.sh');
 assertTest("docker/entrypoint.sh validates vendor/autoload.php presence", strpos($entrypointContent, 'vendor/autoload.php') !== false);
 assertTest("docker/entrypoint.sh contains NO --ignore-platform-reqs bypass", strpos($entrypointContent, '--ignore-platform-reqs') === false);
 assertTest("docker/entrypoint.sh validates SECURITY_KEY presence and length", strpos($entrypointContent, 'SECURITY_KEY') !== false && strpos($entrypointContent, '-lt 32') !== false);
+assertTest("docker/entrypoint.sh rejects known placeholder secrets", strpos($entrypointContent, 'is_placeholder') !== false);
 
 assertTest("docker/ssl/generate-certs.sh exists for local certificate generation", file_exists($rootDir . '/docker/ssl/generate-certs.sh'));
 assertTest("docker/ssl/README.md documents secure certificate generation and rotation", file_exists($rootDir . '/docker/ssl/README.md'));
@@ -132,6 +142,7 @@ assertTest("docker-compose.yml has NO full application bind mount (no .:/var/www
 assertTest("docker-compose.yml isolates storage using persistent named volumes", strpos($dockerComposeContent, 'sparky_courses:') !== false && strpos($dockerComposeContent, 'sparky_upload:') !== false);
 assertTest("docker-compose.yml defines app healthcheck", strpos($dockerComposeContent, 'container_name: sparky_app') !== false && strpos($dockerComposeContent, 'file_exists') !== false);
 assertTest("docker-compose.yml defines web healthcheck", strpos($dockerComposeContent, 'container_name: sparky_web') !== false && strpos($dockerComposeContent, 'wget --spider') !== false);
+assertTest("docker-compose.yml web container builds custom Dockerfile.nginx", strpos($dockerComposeContent, 'dockerfile: docker/Dockerfile.nginx') !== false);
 assertTest("docker-compose.dev.yml exists for local development bind-mounts", file_exists($rootDir . '/docker-compose.dev.yml'));
 
 assertTest("docker/sparky-routes.inc exists", file_exists($rootDir . '/docker/sparky-routes.inc'));

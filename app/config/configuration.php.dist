@@ -26,11 +26,34 @@ $_configuration['url_append'] = '';
 
 // 3. Security & Application Signing Keys
 $envSecurityKey = getenv('SECURITY_KEY');
-if (empty($envSecurityKey) || strlen(trim($envSecurityKey)) < 32) {
+$insecurePlaceholders = [
+    'sparky_prod_sec_key_ChangeThisInProduction!',
+    'replace_with_64_character_hex_key_generated_via_openssl_rand_hex_32',
+    'ChangeMe_StrongDbPassword_2026!',
+    'ChangeMe_StrongRootPassword_2026!',
+    'ChangeMe_StrongRedisPassword_2026!',
+    'Your32CharRandomProductionSecurityKey!',
+    '12345678901234567890123456789012',
+    'abcdefghijklmnopqrstuvwxyz123456',
+];
+$isPlaceholder = false;
+if (!empty($envSecurityKey)) {
+    foreach ($insecurePlaceholders as $placeholder) {
+        if (stripos($envSecurityKey, $placeholder) !== false) {
+            $isPlaceholder = true;
+            break;
+        }
+    }
+    if (preg_match('/^(changeme|replace_with|testpass|your_secret)/i', $envSecurityKey)) {
+        $isPlaceholder = true;
+    }
+}
+
+if (empty($envSecurityKey) || strlen(trim($envSecurityKey)) < 32 || $isPlaceholder) {
     if (PHP_SAPI !== 'cli') {
         http_response_code(500);
-        error_log('[Sparky LMS] CRITICAL CONFIGURATION ERROR: SECURITY_KEY environment variable is missing or less than 32 characters.');
-        echo "<h1>Internal Configuration Error</h1><p>Application signing key (SECURITY_KEY) is not properly configured. Please contact the system administrator.</p>";
+        error_log('[Sparky LMS] CRITICAL CONFIGURATION ERROR: SECURITY_KEY is missing, under 32 characters, or contains an insecure placeholder.');
+        echo "<h1>Internal Configuration Error</h1><p>Application signing key (SECURITY_KEY) is invalid or using a known placeholder. Please generate a unique secret using `openssl rand -hex 32`.</p>";
         exit(1);
     }
     // In CLI test / development runner without env, set safe deterministic entropy
