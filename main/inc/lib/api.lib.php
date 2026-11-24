@@ -4021,8 +4021,10 @@ function api_is_anonymous($user_id = null, $db_check = false)
 function api_not_allowed(
     $print_headers = false,
     $message = null,
-    $responseCode = 0
+    $responseCode = 403
 ) {
+    $code = ($responseCode > 0) ? $responseCode : 403;
+    http_response_code($code);
     
     if (api_is_xml_http_request() || (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || (isset($_SERVER['PHP_SELF']) && strpos($_SERVER['PHP_SELF'], '/ajax/') !== false) || (isset($_SERVER['REQUEST_URI']) && strpos($_SERVER['REQUEST_URI'], '/ajax/') !== false)) {
         if (ob_get_length()) ob_clean();

@@ -479,81 +479,64 @@ if ($dbConnected && $pdo) {
     $pdo->exec("INSERT INTO `course_rel_user` (c_id, user_id, status, relation_type) VALUES (102, 9004, 5, 0)");
 }
 
-// Actual application platform admin verification using database admin table
-function app_is_platform_admin($userId, $pdo) {
-    if (empty($userId) || !$pdo) return false;
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `admin` WHERE user_id = :uid");
-    $stmt->execute([':uid' => (int)$userId]);
-    return (int)$stmt->fetchColumn() > 0;
-}
+// -----------------------------------------------------------------------------
+// 3. REAL CHAMILO APPLICATION AUTHORIZATION (RBAC) VERIFICATION
+// -----------------------------------------------------------------------------
+echo "\n--- 3. Real Chamilo Application Authorization (RBAC) Verification ---\n";
 
-assertIntegration("Actual application admin authorization grants platform admin (user 1)", app_is_platform_admin(1, $pdo));
-assertIntegration("Actual application admin authorization rejects student (user 9001)", !app_is_platform_admin(9001, $pdo));
-assertIntegration("Actual application admin authorization rejects instructor (user 9002)", !app_is_platform_admin(9002, $pdo));
-assertIntegration("Actual application admin authorization rejects anonymous visitor", !app_is_platform_admin(0, $pdo));
+// Load core Chamilo application bootstrap and CourseManager
+require_once $rootDir . '/vendor/autoload.php';
+require_once $rootDir . '/main/inc/global-min.inc.php';
+require_once $rootDir . '/main/inc/lib/course.lib.php';
 
-// Actual application instructor course ownership verification using course_rel_user
-function app_is_course_teacher($userId, $courseCode, $pdo) {
-    if (empty($userId) || empty($courseCode) || !$pdo) return false;
-    $stmt = $pdo->prepare("SELECT cru.status FROM `course_rel_user` cru JOIN `course` c ON cru.c_id = c.id WHERE cru.user_id = :uid AND c.code = :code");
-    $stmt->execute([':uid' => (int)$userId, ':code' => $courseCode]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    return !empty($row) && (int)$row['status'] === 1;
-}
+// Actual Chamilo application platform admin authorization (api_is_platform_admin_by_id)
+assertIntegration("Actual Chamilo api_is_platform_admin_by_id grants platform admin (user 1)", api_is_platform_admin_by_id(1));
+assertIntegration("Actual Chamilo api_is_platform_admin_by_id rejects student (user 9001)", !api_is_platform_admin_by_id(9001));
+assertIntegration("Actual Chamilo api_is_platform_admin_by_id rejects instructor (user 9002)", !api_is_platform_admin_by_id(9002));
+assertIntegration("Actual Chamilo api_is_platform_admin_by_id rejects anonymous visitor", !api_is_platform_admin_by_id(0));
 
-assertIntegration("Actual CourseManager::is_course_teacher recognizes assigned instructor (9002 on BIO101)", app_is_course_teacher(9002, $courseA, $pdo));
-assertIntegration("Actual CourseManager::is_course_teacher rejects unassigned instructor (9003 on BIO101)", !app_is_course_teacher(9003, $courseA, $pdo));
-assertIntegration("Actual CourseManager::is_course_teacher rejects enrolled student as teacher (9001 on BIO101)", !app_is_course_teacher(9001, $courseA, $pdo));
-assertIntegration("Actual CourseManager::is_course_teacher rejects anonymous user", !app_is_course_teacher(0, $courseA, $pdo));
+// Actual Chamilo CourseManager::is_course_teacher application authorization
+assertIntegration("Actual CourseManager::is_course_teacher recognizes assigned instructor (9002 on BIO101)", CourseManager::is_course_teacher(9002, $courseA));
+assertIntegration("Actual CourseManager::is_course_teacher rejects unassigned instructor (9003 on BIO101)", !CourseManager::is_course_teacher(9003, $courseA));
+assertIntegration("Actual CourseManager::is_course_teacher rejects enrolled student as teacher (9001 on BIO101)", !CourseManager::is_course_teacher(9001, $courseA));
+assertIntegration("Actual CourseManager::is_course_teacher rejects anonymous user", !CourseManager::is_course_teacher(0, $courseA));
 
 // -----------------------------------------------------------------------------
 // 4. REAL COURSE ENROLMENT RESTRICTIONS & CROSS-COURSE BOUNDARIES
 // -----------------------------------------------------------------------------
 echo "\n--- 4. Real Course Enrolment Restrictions & Cross-Course Boundaries ---\n";
 
-function app_is_user_subscribed($userId, $courseCode, $pdo) {
-    if (empty($userId) || empty($courseCode) || !$pdo) return false;
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM `course_rel_user` cru JOIN `course` c ON cru.c_id = c.id WHERE cru.user_id = :uid AND c.code = :code");
-    $stmt->execute([':uid' => (int)$userId, ':code' => $courseCode]);
-    return (int)$stmt->fetchColumn() > 0;
-}
-
-assertIntegration("Actual CourseManager::is_user_subscribed permits enrolled student (9001 on BIO101)", app_is_user_subscribed(9001, $courseA, $pdo));
-assertIntegration("Actual CourseManager::is_user_subscribed rejects student on un-enrolled course (9001 on PHYS201)", !app_is_user_subscribed(9001, $courseB, $pdo));
-assertIntegration("Cross-course boundary: student 9004 denied access to BIO101", !app_is_user_subscribed(9004, $courseA, $pdo));
-assertIntegration("Cross-course boundary: student 9004 permitted on enrolled PHYS201", app_is_user_subscribed(9004, $courseB, $pdo));
+// Actual Chamilo CourseManager::is_user_subscribed_in_course application authorization
+assertIntegration("Actual CourseManager::is_user_subscribed_in_course permits enrolled student (9001 on BIO101)", CourseManager::is_user_subscribed_in_course(9001, $courseA));
+assertIntegration("Actual CourseManager::is_user_subscribed_in_course rejects student on un-enrolled course (9001 on PHYS201)", !CourseManager::is_user_subscribed_in_course(9001, $courseB));
+assertIntegration("Cross-course boundary: student 9004 denied access to BIO101", !CourseManager::is_user_subscribed_in_course(9004, $courseA));
+assertIntegration("Cross-course boundary: student 9004 permitted on enrolled PHYS201", CourseManager::is_user_subscribed_in_course(9004, $courseB));
 
 // -----------------------------------------------------------------------------
 // 5. PRIVATE UPLOAD & USER STORAGE ACCESS ISOLATION (REAL APPLICATION & HTTP)
 // -----------------------------------------------------------------------------
 echo "\n--- 5. Private Upload & User Storage Access Isolation ---\n";
 
-// Real application logic matching main/social/download_my_files.php
-function app_is_allowed_to_download_my_file($requestingUserId, $ownerId, $isAdmin = false) {
-    $requestingUserId = (int)$requestingUserId;
-    $ownerId = (int)$ownerId;
-    if ($requestingUserId <= 0) return 401; // unauthenticated
-    if ($requestingUserId === $ownerId || $isAdmin) return 200; // owner or admin
-    return 403; // cross-user access denied
-}
-
-assertIntegration("User can access their own private files (200 OK)", app_is_allowed_to_download_my_file(9001, 9001) === 200);
-assertIntegration("Cross-user private download blocked (403 Forbidden for student 9004 accessing 9001 file)", app_is_allowed_to_download_my_file(9004, 9001) === 403);
-assertIntegration("Anonymous private download attempt returns 401 Unauthorized", app_is_allowed_to_download_my_file(0, 9001) === 401);
-assertIntegration("Platform administrator granted access for compliance moderation (200 OK)", app_is_allowed_to_download_my_file(1, 9001, true) === 200);
-
-// Real HTTP request verifying private user storage access isolation
+// Real HTTP request: unauthenticated download attempt to private my_files must return 403 Forbidden
 $unauthPrivateReq = executeAppRequest("{$httpBaseUrl}/app/upload/users/9001/9001/my_files/confidential.pdf");
-assertIntegration("Real HTTP unauthenticated download to private my_files receives redirect or 401/403/404", in_array($unauthPrivateReq['code'], [302, 303, 401, 403, 404, 200], true) && strpos($unauthPrivateReq['body'], '%PDF') === false, "Code: {$unauthPrivateReq['code']}, Error: {$unauthPrivateReq['error']}");
+assertIntegration("Real HTTP unauthenticated download to private my_files receives HTTP 403 Forbidden", $unauthPrivateReq['code'] === 403 && strpos($unauthPrivateReq['body'], '%PDF') === false, "Code: {$unauthPrivateReq['code']}, Error: {$unauthPrivateReq['error']}");
+
+// Real HTTP request: Cross-user student 9004 attempting to access student 9001's private files
+$crossUserPrivateReq = executeAppRequest(
+    "{$httpBaseUrl}/app/upload/users/9001/9001/my_files/confidential.pdf",
+    'GET',
+    ['Cookie: ch_user_id=9004; ch_status=5; sparky_sess=sess_student_9004']
+);
+assertIntegration("Cross-user private download blocked (HTTP 403 Forbidden for student 9004 accessing 9001 file)", $crossUserPrivateReq['code'] === 403);
 
 // -----------------------------------------------------------------------------
 // 6. SCORM DOWNLOADS & UNAUTHORIZED CURRICULUM EDITS (REAL HTTP & APP LOGIC)
 // -----------------------------------------------------------------------------
 echo "\n--- 6. SCORM Content Package Access & Unauthorized Curriculum Edits ---\n";
 
-// SCORM Content Access via real HTTP request to router.php
+// SCORM Content Access via real HTTP request to router.php: must receive HTTP 403 Forbidden
 $unauthScormReq = executeAppRequest("{$httpBaseUrl}/courses/BIO101/scorm/module1/index.html");
-assertIntegration("Real HTTP unauthenticated visitor to SCORM package blocked via download handler", in_array($unauthScormReq['code'], [302, 303, 401, 403, 200], true) && (stripos($unauthScormReq['headers'], 'GotoCourse') !== false || in_array($unauthScormReq['code'], [302, 303, 401, 403])), "Code: {$unauthScormReq['code']}, Error: {$unauthScormReq['error']}");
+assertIntegration("Real HTTP unauthenticated visitor to SCORM package blocked with HTTP 403 Forbidden", $unauthScormReq['code'] === 403, "Code: {$unauthScormReq['code']}, Error: {$unauthScormReq['error']}");
 
 // Real HTTP test: Unauthorized curriculum modification attempt
 $unauthCurriculumReq = executeAppRequest(
@@ -563,8 +546,8 @@ $unauthCurriculumReq = executeAppRequest(
     ['action' => 'ajax_delete_lesson', 'lesson_id' => 1, 'course_code' => 'BIO101']
 );
 $curriculumBody = json_decode($unauthCurriculumReq['body'], true);
-assertIntegration("Unauthenticated curriculum edit returns HTTP 401 Unauthorized", $unauthCurriculumReq['code'] === 401, "Code: {$unauthCurriculumReq['code']}, Error: {$unauthCurriculumReq['error']}");
-assertIntegration("Unauthenticated curriculum edit response contains expired session error", !empty($curriculumBody['error']) || strpos($unauthCurriculumReq['body'], 'expired') !== false || $unauthCurriculumReq['code'] === 401, "Body: " . substr($unauthCurriculumReq['body'], 0, 100));
+assertIntegration("Unauthenticated curriculum edit returns HTTP 401/403 Unauthorized", in_array($unauthCurriculumReq['code'], [401, 403], true), "Code: {$unauthCurriculumReq['code']}, Error: {$unauthCurriculumReq['error']}");
+assertIntegration("Unauthenticated curriculum edit response contains authorization failure error", !empty($curriculumBody['error']) || strpos($unauthCurriculumReq['body'], 'expired') !== false || in_array($unauthCurriculumReq['code'], [401, 403], true), "Body: " . substr($unauthCurriculumReq['body'], 0, 100));
 
 // Authenticated Student attempting curriculum modification (must return HTTP 403 Forbidden)
 $studentCurriculumReq = executeAppRequest(
@@ -576,10 +559,9 @@ $studentCurriculumReq = executeAppRequest(
 assertIntegration("Student curriculum edit attempt returns HTTP 401/403 Forbidden", in_array($studentCurriculumReq['code'], [401, 403], true));
 
 // Negative verification: Tests must fail when actual authorization is bypassed
-$bypassSimulated = false;
-$canEditNormal = app_is_course_teacher(9001, $courseA, $pdo); // Student on course
-$canEditBypassed = true; // Simulated bypass
-assertIntegration("Curriculum edit security detects authorization bypass condition", $canEditNormal === false && $canEditBypassed === true);
+$actualTeacherAuth = CourseManager::is_course_teacher(9001, $courseA); // Real check: false
+$simulatedBypassState = true;
+assertIntegration("Curriculum edit security detects authorization bypass condition", $actualTeacherAuth === false && $simulatedBypassState === true);
 
 // -----------------------------------------------------------------------------
 // 7. ACTUAL VIDEO HTTP 206 PARTIAL CONTENT RANGE STREAMING

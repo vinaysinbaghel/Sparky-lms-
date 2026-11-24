@@ -84,6 +84,7 @@ if (is_int($global_error_code) && $global_error_code > 0) {
 
     switch ($global_error_code) {
         case 1:
+            http_response_code(500);
             $global_error_message['section'] = $SectionSystemRequirementsProblem;
             $global_error_message['title'] = $IncorrectPhpVersionTitle;
             $php_version = function_exists('phpversion') ? phpversion() : (defined('PHP_VERSION') ? PHP_VERSION : '');
@@ -100,6 +101,7 @@ if (is_int($global_error_code) && $global_error_code > 0) {
             $global_error_message['description'] = $IncorrectPhpVersionDescription;
             break;
         case 2:
+            http_response_code(503);
             require __DIR__.'/../install/version.php';
             $global_error_message['section'] = $SectionInstallation;
             $global_error_message['title'] = $InstallationTitle;
@@ -127,16 +129,19 @@ if (is_int($global_error_code) && $global_error_code > 0) {
         case 3:
         case 4:
         case 5:
+            http_response_code(503);
             $global_error_message['section'] = $SectionDatabaseUnavailable;
             $global_error_message['title'] = $DatabaseUnavailableTitle;
             $global_error_message['description'] = $DatabaseUnavailableDescription;
             break;
         case 6:
+            http_response_code(403);
             $global_error_message['section'] = $SectionProtection;
             $global_error_message['title'] = $AlreadyInstalledTitle;
             $global_error_message['description'] = $AlreadyInstalledDescription;
             break;
         default:
+            http_response_code(500);
             $global_error_message['section'] = $SectionTechnicalIssues;
             $global_error_message['title'] = $TechnicalIssuesTitle;
             $global_error_message['description'] = $TechnicalIssuesDescription;

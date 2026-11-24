@@ -86,8 +86,95 @@ jobs:
       - name: Run Real HTTP Request & Authorization Suite
         run: php tests/test_http_requests.php
 
-      - name: Run Concurrency Benchmark Suite (50, 100, 250 learners)
-        run: php tests/test_concurrency.php
-
       - name: Run Full Integration Test Suite (MariaDB & Redis)
         run: php tests/test_integration.php
+
+  e2e-stack:
+    name: Production Docker Compose Stack E2E
+    runs-on: ubuntu-latest
+    needs: [verify]
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup PHP Environment
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, fileinfo, gd, intl, json, mbstring, xml, zip, pdo_mysql, mysqli, redis
+          coverage: none
+
+      - name: Generate Fresh Test Secrets & Local Certificates
+        run: |
+          mkdir -p docker/ssl
+          bash docker/ssl/generate-certs.sh
+          cat << 'EOF' > .env
+          TEST_MODE=1
+          APP_ENV=test
+          APP_DEBUG=0
+          APP_HOST=localhost
+          SECURITY_KEY=a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90
+          DB_HOST=db
+          DB_PORT=3306
+          DB_NAME=sparky_integration_test
+          DB_USER=sparky_test_user
+          DB_PASSWORD=test_user_pass_123
+          MYSQL_ROOT_PASSWORD=test_root_pass_123
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_PASSWORD=test_redis_secure_pass_2026
+          EOF
+
+      - name: Build Production Images
+        run: docker compose build
+
+      - name: Start Complete Docker Compose Stack
+        run: docker compose up -d
+
+      - name: Wait for All Container Health Checks
+        run: |
+          echo "Waiting for all containers (db, redis, app, web) to report healthy..."
+          timeout=120
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            healthy=$(docker compose ps --filter "health=healthy" -q | wc -l)
+            total=$(docker compose ps -q | wc -l)
+            echo "Healthy containers: $healthy / $total"
+            if [ "$healthy" -ge 4 ] && [ "$total" -ge 4 ]; then
+              echo "Complete production stack is healthy!"
+              break
+            fi
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+          if [ $elapsed -ge $timeout ]; do
+            echo "ERROR: Stack health check timed out."
+            docker compose ps
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Verify Application through Nginx Gateway (HTTPS)
+        env:
+          TEST_MODE: "1"
+          TARGET_URL: "https://localhost"
+          TEST_DB_HOST: "127.0.0.1"
+          TEST_DB_PORT: "3306"
+          TEST_DB_NAME: "sparky_integration_test"
+          TEST_DB_USER: "sparky_test_user"
+          TEST_DB_PASSWORD: "test_user_pass_123"
+          TEST_REDIS_HOST: "127.0.0.1"
+          TEST_REDIS_PORT: "6379"
+          TEST_REDIS_PASSWORD: "test_redis_secure_pass_2026"
+        run: |
+          php tests/test_concurrency.php
+
+      - name: Capture Container Logs on Failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Shutdown Disposable Environment
+        if: always()
+        run: |
+          docker compose down -v --remove-orphans
+          rm -f .env

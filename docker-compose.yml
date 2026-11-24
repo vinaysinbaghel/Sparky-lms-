@@ -59,6 +59,8 @@ services:
     image: mariadb:11.4
     container_name: sparky_db
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Error - MYSQL_ROOT_PASSWORD must be set in .env file}
       MYSQL_DATABASE: ${DB_NAME:-sparky_lms}
@@ -77,6 +79,8 @@ services:
     image: redis:7-alpine
     container_name: sparky_redis
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Error - REDIS_PASSWORD must be set in .env file}
     command: >

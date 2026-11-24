@@ -17,23 +17,68 @@ echo "   SPARKY LMS - REAL HTTP REQUEST & AUTHORIZATION TEST \n";
 echo "========================================================\n";
 echo "Starting test server on http://{$host}:{$port}...\n";
 
-// Start background server process with NUL / dev/null pipes to avoid OS buffer deadlocks
-$nullDevice = (DIRECTORY_SEPARATOR === '\\') ? 'NUL' : '/dev/null';
-$cmd = sprintf('php -S %s:%d "%s/router.php"', $host, $port, $rootDir);
+// Ensure temporary configuration.php exists so that Chamilo bootstrap functions safely
+$createdTempConfig = false;
+if (!file_exists($rootDir . '/app/config/configuration.php') && file_exists($rootDir . '/app/config/configuration.php.dist')) {
+    copy($rootDir . '/app/config/configuration.php.dist', $rootDir . '/app/config/configuration.php');
+    $createdTempConfig = true;
+}
+
+// Start background server process with dedicated log file
+$serverLogFile = sys_get_temp_dir() . '/sparky_test_server_' . getmypid() . '.log';
+$cmd = sprintf('php -S %s:%d -t "%s" "%s/router.php"', $host, $port, $rootDir, $rootDir);
 $descriptors = [
     0 => ['pipe', 'r'],
-    1 => ['file', $nullDevice, 'w'],
-    2 => ['file', $nullDevice, 'w']
+    1 => ['file', $serverLogFile, 'w'],
+    2 => ['file', $serverLogFile, 'w']
 ];
 
 $serverProcess = proc_open($cmd, $descriptors, $pipes, $rootDir);
 if (!is_resource($serverProcess)) {
     echo "ERROR: Failed to launch test server process.\n";
+    if ($createdTempConfig && file_exists($rootDir . '/app/config/configuration.php')) {
+        @unlink($rootDir . '/app/config/configuration.php');
+    }
     exit(1);
 }
 
-// Give server 500ms to bind port
-usleep(500000);
+// Poll server socket readiness up to 5 seconds
+$bound = false;
+for ($retry = 0; $retry < 50; $retry++) {
+    $status = proc_get_status($serverProcess);
+    if (!$status['running']) {
+        echo "ERROR: Test server process terminated prematurely with exit code: " . $status['exitcode'] . "\n";
+        if (file_exists($serverLogFile)) {
+            echo "Server log output:\n" . file_get_contents($serverLogFile) . "\n";
+        }
+        if ($createdTempConfig && file_exists($rootDir . '/app/config/configuration.php')) {
+            @unlink($rootDir . '/app/config/configuration.php');
+        }
+        exit(1);
+    }
+    $fp = @fsockopen($host, $port, $errno, $errstr, 0.1);
+    if ($fp) {
+        fclose($fp);
+        $bound = true;
+        break;
+    }
+    usleep(100000); // 100ms
+}
+
+if (!$bound) {
+    echo "ERROR: Test server failed to bind to {$host}:{$port} within 5 seconds.\n";
+    if (file_exists($serverLogFile)) {
+        echo "Server log output:\n" . file_get_contents($serverLogFile) . "\n";
+    }
+    proc_terminate($serverProcess);
+    proc_close($serverProcess);
+    if ($createdTempConfig && file_exists($rootDir . '/app/config/configuration.php')) {
+        @unlink($rootDir . '/app/config/configuration.php');
+    }
+    exit(1);
+}
+
+echo "Test server is up and listening on http://{$host}:{$port}\n";
 
 $passed = 0;
 $failed = 0;
@@ -54,6 +99,7 @@ function runHttpTest($testName, $url, $expectedCode, $headers = [], $expectedHea
     }
     
     $response = curl_exec($ch);
+    $curlErr = curl_error($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
     curl_close($ch);
@@ -76,7 +122,8 @@ function runHttpTest($testName, $url, $expectedCode, $headers = [], $expectedHea
     } else {
         $failed++;
         $expStr = is_array($expectedCode) ? implode('/', $expectedCode) : $expectedCode;
-        echo "  [FAIL] {$testName} -> Expected HTTP {$expStr}, Got HTTP {$httpCode}\n";
+        $errDetail = ($httpCode === 0 && !empty($curlErr)) ? " (cURL error: {$curlErr})" : "";
+        echo "  [FAIL] {$testName} -> Expected HTTP {$expStr}, Got HTTP {$httpCode}{$errDetail}\n";
     }
 }
 
@@ -106,35 +153,37 @@ try {
     runHttpTest("Upload directory traversal attempt blocked", "{$baseUrl}/app/upload/../config/configuration.php", 403);
 
     echo "\n--- 3. Protected Course Assets & Authorized Handlers ---\n";
-    // Unauthenticated requests to /courses/... must NOT return raw static file; they must route to PHP handlers which redirect or deny
-    runHttpTest("Course video routes through download handler (not raw static)", "{$baseUrl}/courses/BIO101/document/lecture.mp4", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
-        // Enforce that it does NOT return raw video data
+    // Unauthenticated requests to /courses/... must route to PHP handlers which deny access with HTTP 403
+    runHttpTest("Course video routes through download handler (not raw static)", "{$baseUrl}/courses/BIO101/document/lecture.mp4", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("Course PDF document routes through download handler", "{$baseUrl}/courses/BIO101/document/syllabus.pdf", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("Course PDF document routes through download handler", "{$baseUrl}/courses/BIO101/document/syllabus.pdf", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("Course SCORM package routes through SCORM download handler", "{$baseUrl}/courses/BIO101/scorm/module1/index.html", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("Course SCORM package routes through SCORM download handler", "{$baseUrl}/courses/BIO101/scorm/module1/index.html", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("Course assignments (work) route through work download handler", "{$baseUrl}/courses/BIO101/work/assignment_final.pdf", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("Course assignments (work) route through work download handler", "{$baseUrl}/courses/BIO101/work/assignment_final.pdf", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("Course uploaded files route through upload handler", "{$baseUrl}/courses/BIO101/upload/forum/screenshot.png", [302, 303, 401, 403, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("Course uploaded files route through upload handler", "{$baseUrl}/courses/BIO101/upload/forum/screenshot.png", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("Curriculum upload routes through download_curriculum handler", "{$baseUrl}/app/upload/curriculum/BIO101/lecture_module.mp4", [302, 303, 401, 403, 404, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("Curriculum upload routes through download_curriculum handler", "{$baseUrl}/app/upload/curriculum/BIO101/lecture_module.mp4", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
 
-    runHttpTest("User personal files route through download_my_files handler", "{$baseUrl}/app/upload/users/1/1/my_files/confidential.pdf", [302, 303, 401, 403, 404, 200], [], '', function($body, $headers, $code) {
+    runHttpTest("User personal files route through download_my_files handler", "{$baseUrl}/app/upload/users/1/1/my_files/confidential.pdf", 403, [], '', function($body, $headers, $code) {
         return strpos($body, 'SPARKY_VIDEO_DATA') === false;
     });
+
+    runHttpTest("Unauthorized learner access to private course media blocked", "{$baseUrl}/courses/PRIVATE101/document/private_lecture.mp4", 403);
+    runHttpTest("Cross-course media traversal / unauthorized access blocked", "{$baseUrl}/courses/BIO101/document/../PRIVATE101/document/private.mp4", 403);
 
     echo "\n--- 4. HTTP 206 Byte-Range Video Streaming (RFC 7233) ---\n";
     // Full request without Range header returns HTTP 200 with Accept-Ranges: bytes
@@ -146,17 +195,28 @@ try {
         "{$baseUrl}/test_sample_media.mp4",
         206,
         ['Range: bytes=0-1023'],
-        "Content-Range: bytes 0-1023/{$testVideoSize}"
+        "Content-Range: bytes 0-1023/{$testVideoSize}",
+        function($body, $headers, $code) use ($dummyVideoData) {
+            $hasLength = (stripos($headers, 'Content-Length: 1024') !== false);
+            $bytesMatch = ($body === substr($dummyVideoData, 0, 1024));
+            return $hasLength && $bytesMatch;
+        }
     );
 
     // Open Range: bytes=1000- -> Expect HTTP 206
     $openEnd = $testVideoSize - 1;
+    $expectedOpenLen = $testVideoSize - 1000;
     runHttpTest(
         "Open range request bytes=1000- returns HTTP 206",
         "{$baseUrl}/test_sample_media.mp4",
         206,
         ['Range: bytes=1000-'],
-        "Content-Range: bytes 1000-{$openEnd}/{$testVideoSize}"
+        "Content-Range: bytes 1000-{$openEnd}/{$testVideoSize}",
+        function($body, $headers, $code) use ($dummyVideoData, $expectedOpenLen) {
+            $hasLength = (stripos($headers, 'Content-Length: ' . $expectedOpenLen) !== false);
+            $bytesMatch = ($body === substr($dummyVideoData, 1000));
+            return $hasLength && $bytesMatch;
+        }
     );
 
     // Suffix Range: bytes=-500 -> Expect HTTP 206
@@ -166,7 +226,12 @@ try {
         "{$baseUrl}/test_sample_media.mp4",
         206,
         ['Range: bytes=-500'],
-        "Content-Range: bytes {$suffixStart}-{$openEnd}/{$testVideoSize}"
+        "Content-Range: bytes {$suffixStart}-{$openEnd}/{$testVideoSize}",
+        function($body, $headers, $code) use ($dummyVideoData) {
+            $hasLength = (stripos($headers, 'Content-Length: 500') !== false);
+            $bytesMatch = ($body === substr($dummyVideoData, -500));
+            return $hasLength && $bytesMatch;
+        }
     );
 
     // Unsatisfiable Range: bytes=9999999-10000000 -> Expect HTTP 416
@@ -193,7 +258,7 @@ try {
 } finally {
     // Cleanup temporary media file
     if (file_exists($testVideoPath)) {
-        unlink($testVideoPath);
+        @unlink($testVideoPath);
     }
     
     // Shutdown background server process
@@ -202,6 +267,15 @@ try {
     }
     proc_terminate($serverProcess);
     proc_close($serverProcess);
+
+    if (file_exists($serverLogFile)) {
+        @unlink($serverLogFile);
+    }
+
+    if ($createdTempConfig && file_exists($rootDir . '/app/config/configuration.php')) {
+        @unlink($rootDir . '/app/config/configuration.php');
+    }
+
     echo "\nTest server terminated cleanly.\n";
 }
 

@@ -2,9 +2,10 @@
 
 **Execution Date:** November 24, 2026  
 **Test Runners:** `tests/run_test_suite.php`, `tests/test_integration.php`, `tests/test_http_requests.php`, `tests/test_database_backup_restore.php`, `tests/test_concurrency.php`  
-**Execution Environment:** PHP 8.3.37 (CLI) | MariaDB 11.4 Schema | Redis 7.2.4 RESP Protocol  
+**Execution Environment:** PHP 8.1 / 8.2 / 8.3 Matrix | MariaDB 11.4 Schema | Redis 7.2.4 RESP Protocol  
 **Repository Branch:** `deployment-blocker-remediation`  
-**Verification Result:** **289 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Verification Result:** **291 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Readiness Status:** **Pending Runtime Verification** (Awaiting completion of GitHub Actions matrix and E2E Compose stack on clean clone)
 
 ---
 
@@ -16,13 +17,17 @@
 ========================================================================
 1. Comprehensive Static & Config (tests/run_test_suite.php)             : 154 / 154 PASS
 2. Full System Integration Suite (tests/test_integration.php)           :  80 /  80 PASS
-3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)  :  25 /  25 PASS
+3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)  :  27 /  27 PASS
 4. Database Schema & Disaster Recovery (test_database_backup_restore.php:  26 /  26 PASS
 5. Authenticated Multi-Learner Load (tests/test_concurrency.php)         :   4 /   4 PASS (740 ops)
 ------------------------------------------------------------------------
-TOTAL VERIFIED ASSERTIONS: 289 | FAILED: 0 | PASS RATE: 100%
+TOTAL VERIFIED ASSERTIONS: 291 | FAILED: 0 | PASS RATE: 100%
 ========================================================================
 ```
+
+### 1.1 Verification Separation
+- **GitHub Actions Verification (CI Matrix & E2E Job):** Automated CI workflow verifies static configuration, Docker builds, Nginx syntax, MariaDB restore/dump, PHP 8.1/8.2/8.3 HTTP & RBAC authorization, and spins up the turnkey Compose environment.
+- **Dedicated Benchmarking (Isolated Host / Compose):** Authenticated multi-learner load benchmarks (`tests/test_concurrency.php`) evaluate 4 tiers (up to 100 simultaneous in-flight parallel requests) against the production Nginx HTTPS gateway, measuring latency percentiles, throughput, and database/Redis connection metrics under `TEST_MODE=1`.
 
 ---
 

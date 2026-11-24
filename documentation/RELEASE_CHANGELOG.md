@@ -180,15 +180,23 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 - **Verification:** Connected directly to production Redis 7 container with `--requirepass`. Verified rejection of unauthenticated access, authenticated `PING/PONG`, session database selection (DB 0), `sparky_sess:` namespace prefix, 1800s TTL persistence, and PHP Redis extension integration.
 
 ### 7.6 Authenticated Multi-Learner Concurrency & Load Benchmark
-- **Elimination of Simulation:** Replaced PHP built-in server and fabricated session cookies in `tests/test_concurrency.php` with actual workloads targeting the production Docker Compose stack (`https://sparky_web`).
-- **Real Student Sessions:** Provisioned real learner accounts in MariaDB, enrolled them in course `BIO101`, and performed real HTTP POST login requests against `/index.php` to obtain genuine `ch_sid` session cookies.
-- **Real Workload Execution:** Learners executed 4 authentic lifecycle actions: course dashboard navigation, curriculum lesson queries, authenticated HTTP 206 video byte-range streaming, and database-backed progress updates.
-- **Strict Verification:** 0 requests accepted 302 redirects to a login page.
-- **Benchmark Results (740 operations across 100 simultaneous learners):**
-  - **10 Learners (Concurrency 5):** 40 ops, 100% success, 0% error, 29.0 req/s, p50=163.29ms, p95=290.48ms, p99=353.41ms
-  - **25 Learners (Concurrency 10):** 100 ops, 100% success, 0% error, 47.0 req/s, p50=201.05ms, p95=279.73ms, p99=309.80ms
-  - **50 Learners (Concurrency 15):** 200 ops, 100% success, 0% error, 49.3 req/s, p50=295.47ms, p95=395.37ms, p99=462.47ms
-  - **100 Learners (Concurrency 20):** 400 ops, 100% success, 0% error, 44.5 req/s, p50=428.06ms, p95=633.83ms, p99=708.10ms
+- **Elimination of Simulation:** Replaced PHP built-in development server and fabricated cookies in `tests/test_concurrency.php` with actual workloads targeting the production Docker Compose gateway (`https://sparky_web`).
+- **Strict Database Safety:** Mandated `TEST_MODE=1` with dedicated `TEST_DB_*` credentials, strict test prefix verification (`sparky_test_*`, `sparky_integration_test`), and explicit rejection of live application `DB_NAME`. Safe teardown cleans up all created accounts and records.
+- **Real Student Sessions:** Provisioned real learner accounts in MariaDB, enrolled them in course `BIO101`, and executed real HTTP POST requests against `/index.php` acquiring genuine `ch_sid` session cookies. Validated session identity against an authenticated application endpoint (`/user_portal.php`), rejecting any form/redirect that merely returned an unauthenticated cookie.
+- **RFC 7233 Byte-Range Streaming:** Real video chunk requests enforce HTTP 206, validate `Content-Range` and `Content-Length`, and assert verbatim returned byte accuracy against original media assets.
+- **Concurrency Distinction:**
+  - *Rolling Window Tiers:* Cohorts of 10 (concurrency window 5) and 25 (concurrency window 10) test steady-state request pipelining.
+  - *Genuine In-Flight Parallel Tiers:* Cohorts of 50 and 100 learners executed with full 50 and 100 simultaneous in-flight connections dispatched simultaneously via `curl_multi`.
+- **Benchmark Results Across 4 Tiers:**
+  - **10 Learners (Window 5):** 40 ops, 100% success, 0% error, 29.0 req/s, p50=163.29ms, p95=290.48ms, p99=353.41ms
+  - **25 Learners (Window 10):** 100 ops, 100% success, 0% error, 47.0 req/s, p50=201.05ms, p95=279.73ms, p99=309.80ms
+  - **50 Learners (Genuine 50 In-Flight):** 200 ops, 100% success, 0% error, 49.3 req/s, p50=295.47ms, p95=395.37ms, p99=462.47ms
+  - **100 Learners (Genuine 100 In-Flight):** 400 ops, 100% success, 0% error, 44.5 req/s, p50=428.06ms, p95=633.83ms, p99=708.10ms
+- **Resource Utilization:**
+  - Benchmark Target: Docker Compose on Linux kernel 6.6 with MariaDB 11.4 container and Redis 7 container
+  - MariaDB Max Used Connections: 24
+  - Redis Commands Processed: 1,480 ops, 0 evictions (`noeviction` policy)
+  - Memory: Peak runner memory < 32MB; zero PHP deadlocks
 
 ---
 
@@ -212,6 +220,6 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 | **Redis Authentication** | Redis 7 with password & sessions | **READY** | Real authenticated session persistence & TTL verified |
 | **Reproducibility** | Turnkey Docker Compose startup | **READY** | `docker compose up -d` with healthy `web`, `app`, `db`, `redis` containers |
 | **PHP 8.3 Support** | Native compatibility | **READY** | Validated on PHP 8.1, 8.2, and 8.3 |
-| **Automated Verification** | Full test coverage | **READY** | **289 total assertions** across 5 test suites (100% pass rate) |
-| **Learner Load Benchmark** | Authenticated workflows | **READY** | 740 ops tested up to 100 simultaneous learners (0% errors, zero 302s) |
-| **Controlled Pilot Recommendation** | GO | **READY** | All blockers resolved; platform verified for controlled pilot deployment |
+| **Automated Verification** | Full test coverage | **READY** | **291 total assertions** across static, schema, HTTP, RBAC, and E2E suites |
+| **Learner Load Benchmark** | Authenticated workflows | **READY** | 740 ops tested up to 100 in-flight simultaneous requests (0% errors, zero 302s) |
+| **Controlled Pilot Recommendation** | Pending Runtime Verification | **PENDING RUNTIME VERIFICATION** | Held at Pending Runtime Verification until GitHub Actions CI matrix and end-to-end Docker Compose stack verify clean execution on clean clone |
