@@ -103,6 +103,55 @@ $restoreCmd = 'mysql -u ${DB_USER} -p"${DB_PASSWORD}" ${DB_NAME} < backup.sql';
 assertDbTest("Backup command specifies --single-transaction and --quick", strpos($backupCmd, '--single-transaction') !== false && strpos($backupCmd, '--quick') !== false);
 assertDbTest("Restore command uses standard input redirection", strpos($restoreCmd, '< backup.sql') !== false);
 
+// Real database restoration test when isolated test database credentials are provided
+if (getenv('TEST_MODE') === '1' && getenv('TEST_DB_HOST') && getenv('TEST_DB_NAME') && getenv('TEST_DB_USER')) {
+    echo "\n--- Real Isolated Database Restoration Execution ---\n";
+    $testDbHost = getenv('TEST_DB_HOST');
+    $testDbPort = (int)(getenv('TEST_DB_PORT') ?: 3306);
+    $testDbName = getenv('TEST_DB_NAME');
+    $testDbUser = getenv('TEST_DB_USER');
+    $testDbPass = getenv('TEST_DB_PASSWORD') ?: '';
+
+    // Enforce test prefix & reject production DB_NAME
+    $validPrefixes = ['sparky_test_', 'test_', 'sparky_integration_test'];
+    $hasValidPrefix = false;
+    foreach ($validPrefixes as $prefix) {
+        if (strpos($testDbName, $prefix) === 0 || $testDbName === $prefix) {
+            $hasValidPrefix = true;
+            break;
+        }
+    }
+    assertDbTest("Restoration target uses approved test prefix", $hasValidPrefix);
+    
+    $appDbName = getenv('DB_NAME') ?: 'sparky_lms';
+    assertDbTest("Restoration target does not match application DB_NAME", strcasecmp($testDbName, $appDbName) !== 0);
+
+    try {
+        $pdo = new PDO("mysql:host={$testDbHost};port={$testDbPort};dbname={$testDbName};charset=utf8mb4", $testDbUser, $testDbPass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 5,
+            PDO::MYSQL_ATTR_MULTI_STATEMENTS => true
+        ]);
+        assertDbTest("Connected to isolated test database for restoration test", true);
+
+        // Execute dump import
+        $schemaSql = file_get_contents($sqlDumpPath);
+        $schemaSql = preg_replace('/CREATE DATABASE\s+[^;]+;/i', '', $schemaSql);
+        $schemaSql = preg_replace('/USE\s+[^;]+;/i', '', $schemaSql);
+        $pdo->exec($schemaSql);
+        while ($pdo->query("SELECT 1")->fetch()) { break; }
+
+        $tablesResult = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        $restoredCount = count($tablesResult);
+        assertDbTest("Restored database contains at least 150 tables (Found: {$restoredCount})", $restoredCount >= 150);
+        assertDbTest("Restored database has core 'user' table", in_array('user', $tablesResult, true));
+        assertDbTest("Restored database has 'settings_current' table", in_array('settings_current', $tablesResult, true));
+    } catch (Exception $e) {
+        assertDbTest("Real database restoration succeeded", false);
+        echo "  [ERROR] Database restoration failed: " . $e->getMessage() . "\n";
+    }
+}
+
 echo "\n========================================================\n";
 echo "BACKUP & RESTORE TESTS PASSED: " . $passed . "\n";
 echo "BACKUP & RESTORE TESTS FAILED: " . $failed . "\n";

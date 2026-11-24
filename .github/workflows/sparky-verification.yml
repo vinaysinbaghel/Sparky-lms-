@@ -147,7 +147,7 @@ jobs:
             sleep 5
             elapsed=$((elapsed + 5))
           done
-          if [ $elapsed -ge $timeout ]; do
+          if [ $elapsed -ge $timeout ]; then
             echo "ERROR: Stack health check timed out."
             docker compose ps
             docker compose logs

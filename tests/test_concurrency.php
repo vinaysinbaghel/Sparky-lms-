@@ -218,6 +218,11 @@ $curriculumFile = $curriculumDir . '/lecture1.mp4';
 $deterministicVideoChunk = str_repeat("SPARKY_CURRICULUM_STREAM_TEST_CHUNK_", 1000); // 36,000 bytes
 file_put_contents($curriculumFile, $deterministicVideoChunk);
 
+// If running against Docker Compose stack, populate the named volume sparky_upload in container
+@exec("docker exec sparky_app mkdir -p /var/www/sparky-lms/app/upload/curriculum/{$courseCode} 2>/dev/null");
+@exec("docker cp \"{$curriculumFile}\" sparky_app:/var/www/sparky-lms/app/upload/curriculum/{$courseCode}/lecture1.mp4 2>/dev/null");
+@exec("docker exec sparky_app chown -R www-data:www-data /var/www/sparky-lms/app/upload/curriculum 2>/dev/null");
+
 // -----------------------------------------------------------------------------
 // 4. Provision Real Learner Accounts & Teardown Registration
 // -----------------------------------------------------------------------------
@@ -277,6 +282,7 @@ function cleanupTestState($pdo, $courseCode, $maxLearners, $curriculumFile) {
     if (file_exists($curriculumFile)) {
         @unlink($curriculumFile);
     }
+    @exec("docker exec sparky_app rm -rf /var/www/sparky-lms/app/upload/curriculum/{$courseCode} 2>/dev/null");
 }
 
 register_shutdown_function('cleanupTestState', $pdo, $courseCode, $maxLearners, $curriculumFile);

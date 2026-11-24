@@ -24,6 +24,32 @@ if (!file_exists($rootDir . '/app/config/configuration.php') && file_exists($roo
     $createdTempConfig = true;
 }
 
+// Ensure isolated test database has schema populated if running with TEST_MODE=1
+if (getenv('TEST_MODE') === '1' && getenv('TEST_DB_HOST') && getenv('TEST_DB_NAME')) {
+    $tHost = getenv('TEST_DB_HOST');
+    $tPort = (int)(getenv('TEST_DB_PORT') ?: 3306);
+    $tName = getenv('TEST_DB_NAME');
+    $tUser = getenv('TEST_DB_USER') ?: 'root';
+    $tPass = getenv('TEST_DB_PASSWORD') ?: '';
+    try {
+        $checkPdo = new PDO("mysql:host={$tHost};port={$tPort};dbname={$tName};charset=utf8mb4", $tUser, $tPass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 3,
+            PDO::MYSQL_ATTR_MULTI_STATEMENTS => true
+        ]);
+        $hasTables = $checkPdo->query("SHOW TABLES LIKE 'settings_current'")->fetch();
+        if (!$hasTables) {
+            $dumpSql = file_get_contents($rootDir . '/database/sparky_clean_database.sql');
+            $dumpSql = preg_replace('/CREATE DATABASE\s+[^;]+;/i', '', $dumpSql);
+            $dumpSql = preg_replace('/USE\s+[^;]+;/i', '', $dumpSql);
+            $checkPdo->exec($dumpSql);
+            while ($checkPdo->query("SELECT 1")->fetch()) { break; }
+        }
+    } catch (Exception $e) {
+        // Ignored in purely mocked / offline test runs
+    }
+}
+
 // Start background server process with dedicated log file
 $serverLogFile = sys_get_temp_dir() . '/sparky_test_server_' . getmypid() . '.log';
 $cmd = sprintf('php -S %s:%d -t "%s" "%s/router.php"', $host, $port, $rootDir, $rootDir);

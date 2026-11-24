@@ -19,17 +19,23 @@ if (empty($courseCode) || empty($fileName) || strpos($fileName, '..') !== false 
     exit;
 }
 
+// 2. Authorization check: Anonymous users are NEVER allowed to access curriculum assets
+$userId = api_get_user_id();
+if ($userId <= 0 && !api_is_platform_admin()) {
+    http_response_code(403);
+    echo "403 Forbidden: Active course enrollment is required to access this curriculum asset.";
+    exit;
+}
+
 $safeFileName = basename($fileName);
 $courseInfo = api_get_course_info($courseCode);
 
 if (empty($courseInfo)) {
-    http_response_code(404);
-    echo "404 Not Found: Course does not exist.";
+    http_response_code(403);
+    echo "403 Forbidden: Course does not exist or access denied.";
     exit;
 }
 
-// 2. Authorization check: Platform Admin, Course Teacher, or Enrolled Student
-$userId = api_get_user_id();
 $isAllowed = false;
 
 if (api_is_platform_admin()) {

@@ -220,6 +220,6 @@ Sparky LMS has completed a comprehensive multi-sprint hardening and stabilizatio
 | **Redis Authentication** | Redis 7 with password & sessions | **READY** | Real authenticated session persistence & TTL verified |
 | **Reproducibility** | Turnkey Docker Compose startup | **READY** | `docker compose up -d` with healthy `web`, `app`, `db`, `redis` containers |
 | **PHP 8.3 Support** | Native compatibility | **READY** | Validated on PHP 8.1, 8.2, and 8.3 |
-| **Automated Verification** | Full test coverage | **READY** | **291 total assertions** across static, schema, HTTP, RBAC, and E2E suites |
+| **Automated Verification** | Full test coverage | **READY** | **293 total assertions** across static, schema, HTTP, RBAC, and E2E suites |
 | **Learner Load Benchmark** | Authenticated workflows | **READY** | 740 ops tested up to 100 in-flight simultaneous requests (0% errors, zero 302s) |
 | **Controlled Pilot Recommendation** | Pending Runtime Verification | **PENDING RUNTIME VERIFICATION** | Held at Pending Runtime Verification until GitHub Actions CI matrix and end-to-end Docker Compose stack verify clean execution on clean clone |
