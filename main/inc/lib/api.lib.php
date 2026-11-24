@@ -4033,6 +4033,14 @@ function api_not_allowed(
         exit;
     }
 
+    // Minified scripts (e.g. global-min.inc.php) do not load Display or Template classes
+    if (!class_exists('Display') || !class_exists('Template') || !$print_headers) {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: text/html; charset=utf-8');
+        echo "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body><h1>403 Forbidden</h1><p>Access not allowed or session expired.</p></body></html>";
+        exit;
+    }
+
     if (api_get_setting('sso_authentication') === 'true') {
         global $osso;
         if ($osso) {
@@ -4045,8 +4053,7 @@ function api_not_allowed(
 
     global $this_section;
 
-    if (CustomPages::enabled() && (empty($user_id) || api_is_anonymous())) {
-        // Why the CustomPages::enabled() need to be to set the request_uri
+    if (class_exists('CustomPages') && CustomPages::enabled() && (empty($user_id) || api_is_anonymous())) {
         $_SESSION['request_uri'] = $_SERVER['REQUEST_URI'];
         CustomPages::display(CustomPages::INDEX_UNLOGGED);
     }
@@ -4070,10 +4077,7 @@ function api_not_allowed(
 
     $msg = Display::div($msg, ['align' => 'center']);
 
-    $show_headers = 0;
-    if ($print_headers && $origin != 'learnpath') {
-        $show_headers = 1;
-    }
+    $show_headers = ($print_headers && $origin != 'learnpath') ? 1 : 0;
 
     $hideBreadCrumb = false;
     if (api_get_configuration_value('hide_breadcrumb_if_not_allowed')) {
@@ -4088,16 +4092,17 @@ function api_not_allowed(
         (!isset($course) || $course == -1) &&
         empty($_GET['cidReq'])
     ) {
-        // if the access is not authorized and there is some login information
-        // but the cidReq is not found, assume we are missing course data and send the user
-        // to the user_portal
         $tpl->display_one_col_template();
         exit;
     }
 
-    $tplPlugin = new AppPlugin();
-    $loginTopRegionContent = $tplPlugin->load_region('login_top', $tpl, true);
-    $loginBottomRegionContent = $tplPlugin->load_region('login_bottom', $tpl, true);
+    $loginTopRegionContent = '';
+    $loginBottomRegionContent = '';
+    if (class_exists('AppPlugin')) {
+        $tplPlugin = new AppPlugin();
+        $loginTopRegionContent = $tplPlugin->load_region('login_top', $tpl, true);
+        $loginBottomRegionContent = $tplPlugin->load_region('login_bottom', $tpl, true);
+    }
 
     if (!empty($_SERVER['REQUEST_URI']) &&
         (

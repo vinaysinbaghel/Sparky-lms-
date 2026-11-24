@@ -33,7 +33,22 @@ $descriptors = [
     2 => ['file', $serverLogFile, 'w']
 ];
 
-$serverProcess = proc_open($cmd, $descriptors, $pipes, $rootDir);
+$appEnv = [
+    'PATH' => getenv('PATH') ?: '/usr/local/bin:/usr/local/sbin:/usr/bin:/bin',
+    'TEST_MODE' => '1',
+    'TEST_DB_HOST' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
+    'TEST_DB_PORT' => getenv('TEST_DB_PORT') ?: '3306',
+    'TEST_DB_NAME' => getenv('TEST_DB_NAME') ?: 'sparky_integration_test',
+    'TEST_DB_USER' => getenv('TEST_DB_USER') ?: 'sparky_test_user',
+    'TEST_DB_PASSWORD' => getenv('TEST_DB_PASSWORD') ?: 'test_user_pass_123',
+    'SECURITY_KEY' => getenv('SECURITY_KEY') ?: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    'APP_HOST' => "{$host}:{$port}",
+    'REDIS_HOST' => getenv('REDIS_HOST') ?: '127.0.0.1',
+    'REDIS_PORT' => getenv('REDIS_PORT') ?: '6379',
+    'REDIS_PASSWORD' => getenv('REDIS_PASSWORD') ?: 'test_redis_secure_pass_2026'
+];
+
+$serverProcess = proc_open($cmd, $descriptors, $pipes, $rootDir, $appEnv);
 if (!is_resource($serverProcess)) {
     echo "ERROR: Failed to launch test server process.\n";
     if ($createdTempConfig && file_exists($rootDir . '/app/config/configuration.php')) {
@@ -123,7 +138,8 @@ function runHttpTest($testName, $url, $expectedCode, $headers = [], $expectedHea
         $failed++;
         $expStr = is_array($expectedCode) ? implode('/', $expectedCode) : $expectedCode;
         $errDetail = ($httpCode === 0 && !empty($curlErr)) ? " (cURL error: {$curlErr})" : "";
-        echo "  [FAIL] {$testName} -> Expected HTTP {$expStr}, Got HTTP {$httpCode}{$errDetail}\n";
+        $bodyPreview = (!empty($respBody)) ? " [Body: " . trim(substr(strip_tags($respBody), 0, 100)) . "]" : "";
+        echo "  [FAIL] {$testName} -> Expected HTTP {$expStr}, Got HTTP {$httpCode}{$errDetail}{$bodyPreview}\n";
     }
 }
 
@@ -268,6 +284,7 @@ try {
     proc_terminate($serverProcess);
     proc_close($serverProcess);
 
+    $serverLogContents = file_exists($serverLogFile) ? file_get_contents($serverLogFile) : '';
     if (file_exists($serverLogFile)) {
         @unlink($serverLogFile);
     }
@@ -286,6 +303,9 @@ echo "========================================================\n";
 
 if ($failed > 0) {
     echo "HTTP VERIFICATION SUITE FAILED.\n";
+    if (!empty($serverLogContents)) {
+        echo "Server log output:\n" . $serverLogContents . "\n";
+    }
     exit(1);
 } else {
     echo "ALL REAL HTTP REQUEST TESTS PASSED SUCCESSFULLY.\n";
