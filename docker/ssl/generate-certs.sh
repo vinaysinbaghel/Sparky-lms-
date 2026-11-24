@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Sparky LMS — Development SSL/TLS Certificate Generator
+# Sparky LMS â€” Development SSL/TLS Certificate Generator
 # Generates self-signed certificates for local development and testing.
 # NEVER commit the generated key.pem to version control!
 # ==============================================================================

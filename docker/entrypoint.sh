@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Sparky LMS — Application Container Entrypoint (PHP-FPM)
+# Sparky LMS Ã¢â‚¬â€ Application Container Entrypoint (PHP-FPM)
 # Validates mandatory secrets, dependency integrity, and runtime directories.
 # ==============================================================================
 set -e
@@ -63,7 +63,14 @@ fi
 
 echo "[Sparky LMS] Mandatory secrets validated successfully."
 
-# 4. Verify PHP dependencies and autoload.php
+# 4. Generate runtime configuration.php from configuration.php.dist if absent
+if [ ! -f "/var/www/sparky-lms/app/config/configuration.php" ] && [ -f "/var/www/sparky-lms/app/config/configuration.php.dist" ]; then
+    echo "[Sparky LMS] Generating configuration.php from configuration.php.dist..."
+    cp /var/www/sparky-lms/app/config/configuration.php.dist /var/www/sparky-lms/app/config/configuration.php
+    chmod 644 /var/www/sparky-lms/app/config/configuration.php
+fi
+
+# 5. Verify PHP dependencies and autoload.php
 if [ ! -f "/var/www/sparky-lms/vendor/autoload.php" ]; then
     echo "[Sparky LMS] vendor/autoload.php not found. Installing Composer dependencies..."
     if ! composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader; then

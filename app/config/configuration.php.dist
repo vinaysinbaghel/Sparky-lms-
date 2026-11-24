@@ -4,12 +4,13 @@
  * Copy this file to app/config/configuration.php and adjust values or set environment variables.
  */
 
-// 1. Database Connection Settings (supports environment variables)
-$_configuration['db_host']     = getenv('DB_HOST') ?: '127.0.0.1';
-$_configuration['db_port']     = getenv('DB_PORT') ?: '3306';
-$_configuration['main_database'] = getenv('DB_NAME') ?: 'sparky_lms';
-$_configuration['db_user']     = getenv('DB_USER') ?: 'sparky_user';
-$_configuration['db_password'] = getenv('DB_PASSWORD') ?: '';
+// 1. Database Connection Settings (supports environment variables & dedicated test isolation)
+$isTestMode = (getenv('TEST_MODE') === '1');
+$_configuration['db_host']     = ($isTestMode && getenv('TEST_DB_HOST')) ? getenv('TEST_DB_HOST') : (getenv('DB_HOST') ?: '127.0.0.1');
+$_configuration['db_port']     = ($isTestMode && getenv('TEST_DB_PORT')) ? getenv('TEST_DB_PORT') : (getenv('DB_PORT') ?: '3306');
+$_configuration['main_database'] = ($isTestMode && getenv('TEST_DB_NAME')) ? getenv('TEST_DB_NAME') : (getenv('DB_NAME') ?: 'sparky_lms');
+$_configuration['db_user']     = ($isTestMode && getenv('TEST_DB_USER')) ? getenv('TEST_DB_USER') : (getenv('DB_USER') ?: 'sparky_user');
+$_configuration['db_password'] = ($isTestMode && getenv('TEST_DB_PASSWORD')) ? getenv('TEST_DB_PASSWORD') : (getenv('DB_PASSWORD') ?: '');
 
 // 2. Directory & Host Paths
 $sysRoot = rtrim(str_replace('\\', '/', realpath(__DIR__ . '/../../')), '/') . '/';

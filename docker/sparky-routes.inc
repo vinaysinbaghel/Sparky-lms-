@@ -114,7 +114,8 @@ location / {
 location ~ \.php$ {
     try_files $uri =404;
     fastcgi_split_path_info ^(.+\.php)(/.+)$;
-    fastcgi_pass app:9000;
+    set $upstream_app app:9000;
+    fastcgi_pass $upstream_app;
     fastcgi_index index.php;
     fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
     fastcgi_param DOCUMENT_ROOT $document_root;

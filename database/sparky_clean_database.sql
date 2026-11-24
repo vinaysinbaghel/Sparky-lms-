@@ -17,14 +17,6 @@
 /*M!100616 SET @OLD_NOTE_VERBOSITY=@@NOTE_VERBOSITY, NOTE_VERBOSITY=0 */;
 
 --
--- Current Database: `chamilo`
---
-
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `chamilo` /*!40100 DEFAULT CHARACTER SET latin1 COLLATE latin1_swedish_ci */;
-
-USE `chamilo`;
-
---
 -- Table structure for table `access_url`
 --
 

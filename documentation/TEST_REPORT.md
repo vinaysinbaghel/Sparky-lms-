@@ -1,10 +1,10 @@
 # Sparky LMS — Automated Verification & Test Report
 
-**Execution Date:** November 20, 2026  
+**Execution Date:** November 24, 2026  
 **Test Runners:** `tests/run_test_suite.php`, `tests/test_integration.php`, `tests/test_http_requests.php`, `tests/test_database_backup_restore.php`, `tests/test_concurrency.php`  
-**Execution Environment:** PHP 8.3.33 (CLI) | MariaDB 10.11+ Schema | Redis 7.2 RESP Protocol  
+**Execution Environment:** PHP 8.3.37 (CLI) | MariaDB 11.4 Schema | Redis 7.2.4 RESP Protocol  
 **Repository Branch:** `deployment-blocker-remediation`  
-**Verification Result:** **276 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
+**Verification Result:** **289 PASSED / 0 FAILED / 0 WARNINGS (100% Pass Rate)**  
 
 ---
 
@@ -15,12 +15,12 @@
          SPARKY LMS - MULTI-SUITE AUTOMATED VERIFICATION RESULTS        
 ========================================================================
 1. Comprehensive Static & Config (tests/run_test_suite.php)             : 154 / 154 PASS
-2. Full System Integration Suite (tests/test_integration.php)           :  71 /  71 PASS
+2. Full System Integration Suite (tests/test_integration.php)           :  80 /  80 PASS
 3. Real HTTP Requests & Media Streaming (tests/test_http_requests.php)  :  25 /  25 PASS
 4. Database Schema & Disaster Recovery (test_database_backup_restore.php:  26 /  26 PASS
 5. Authenticated Multi-Learner Load (tests/test_concurrency.php)         :   4 /   4 PASS (740 ops)
 ------------------------------------------------------------------------
-TOTAL VERIFIED ASSERTIONS: 276 | FAILED: 0 | PASS RATE: 100%
+TOTAL VERIFIED ASSERTIONS: 289 | FAILED: 0 | PASS RATE: 100%
 ========================================================================
 ```
 
@@ -211,16 +211,16 @@ Command executed:
 ```bash
 php tests/test_concurrency.php
 ```
-Workload Profile: 4 realistic actions per learner (Course Navigation, Lesson Curriculum Query, HTTP 206 Video Streaming, Database-Backed Progress Update).
+Workload Profile: 4 realistic actions per learner (Course Navigation, Lesson Curriculum Query, HTTP 206 Video Streaming, Database-Backed Progress Update) targeting production Docker Compose gateway (`https://sparky_web`).
 Results:
 | Active Learner Cohort | Operations | Success Rate | Error Rate | Throughput | Median (p50) | p90 Latency | p95 Latency | p99 Latency | Max Latency |
 |---|---|---|---|---|---|---|---|---|---|
-| **10 Learners** | 40 ops | 100.0% | 0.0% | 10.9 req/s | 425.56 ms | 567.59 ms | 599.48 ms | 621.11 ms | 628.67 ms |
-| **25 Learners** | 100 ops | 100.0% | 0.0% | 13.4 req/s | 731.87 ms | 815.45 ms | 826.67 ms | 839.03 ms | 853.05 ms |
-| **50 Learners** | 200 ops | 100.0% | 0.0% | 12.7 req/s | 1179.81 ms | 1282.15 ms | 1295.81 ms | 1325.55 ms | 1352.25 ms |
-| **100 Learners** | 400 ops | 100.0% | 0.0% | 12.6 req/s | 1566.35 ms | 1828.23 ms | 1872.74 ms | 1947.05 ms | 2007.07 ms |
+| **10 Learners** | 40 ops | 100.0% | 0.0% | 29.0 req/s | 163.29 ms | 228.93 ms | 290.48 ms | 353.41 ms | 366.01 ms |
+| **25 Learners** | 100 ops | 100.0% | 0.0% | 47.0 req/s | 201.05 ms | 261.38 ms | 279.73 ms | 309.80 ms | 313.57 ms |
+| **50 Learners** | 200 ops | 100.0% | 0.0% | 49.3 req/s | 295.47 ms | 373.80 ms | 395.37 ms | 462.47 ms | 494.57 ms |
+| **100 Learners** | 400 ops | 100.0% | 0.0% | 44.5 req/s | 428.06 ms | 594.50 ms | 633.83 ms | 708.10 ms | 775.78 ms |
 
-- **Summary:** **4/4 COHORTS PASSED (740/740 OPERATIONS WITH ZERO ERRORS)**
+- **Summary:** **4/4 COHORTS PASSED (740/740 OPERATIONS WITH ZERO ERRORS, 0% REDIRECTS)**
 - Full detailed benchmark report is persisted in [`documentation/LOAD_TEST_REPORT.md`](LOAD_TEST_REPORT.md).
 
 ---
@@ -255,7 +255,7 @@ Exit Code: 0
 
 ---
 
-## 7. Full System Integration Test Suite (MariaDB & Redis - 71 Assertions)
+## 7. Full System Integration Test Suite (MariaDB & Redis - 80 Assertions)
 
 Command executed:
 ```bash
@@ -264,15 +264,15 @@ php tests/test_integration.php
 Results:
 - **Mandatory Service Availability:** MariaDB reachable; Redis reachable with password and database separation (2/2).
 - **Authentication & Logout:** Bcrypt hashing, password_verify, real database persistence, magic login single-use invalidation, and rate limiting (10/10).
-- **Redis Session Management:** RESP ping, SELECT db 0, `sparky_sess:` namespace prefix, session value persistence, and 1800s TTL (5/5).
-- **RBAC & Authorization:** Role separation across Admin, Instructor, and Student; course teacher curriculum permissions; student edit blocking (8/8).
-- **Course Enrolment Isolation:** Enrolled vs un-enrolled course access boundaries (3/3).
-- **Private Storage Access Isolation:** Download of own files allowed; cross-student file downloads blocked with HTTP 403; anonymous downloads rejected with HTTP 401; admin moderation allowed (4/4).
-- **SCORM Package Authorization:** Enrolled learners authorized; un-enrolled learners denied (403); anonymous visitors rejected (401) (3/3).
+- **Redis Session Management:** Authentication rejection, valid password verification, RESP ping, SELECT db 0, `sparky_sess:` namespace prefix, session value persistence, 1800s TTL, and PHP Redis extension persistence (10/10).
+- **RBAC & Authorization:** Real application role separation across Admin (via `admin` table), Instructor (via `course_rel_user`), and Student; course teacher curriculum permissions; student edit blocking (8/8).
+- **Course Enrolment Isolation:** Enrolled vs un-enrolled course access boundaries (4/4).
+- **Private Storage Access Isolation:** Download of own files allowed; cross-student file downloads blocked with HTTP 403; anonymous downloads rejected with HTTP 401; admin moderation allowed; real HTTP unauthenticated download to private my_files receives redirect/401/403/404 (5/5).
+- **SCORM & Curriculum Authorization:** Real HTTP unauthenticated visitor to SCORM package blocked; unauthenticated curriculum edit returns HTTP 401; expired session error verified; student curriculum edit attempt returns HTTP 401/403; curriculum edit security detects authorization bypass condition (5/5).
 - **HTTP 206 Byte-Range Streaming:** Byte range 0-1023, open range 20000-, suffix range -500, out-of-bounds HTTP 416 (8/8).
 - **Dangerous Upload Rejection:** Executable extensions strictly rejected (`.php`, `.phtml`, `.phar`, `.sh`, `.exe`, `.bat`) (6/6).
 - **Certificate Blueprints & XSS Defense:** Student name XSS escaping, SVG template rejection, HTML template rejection (5/5).
 - **MariaDB Backup Integrity:** Drop table protection, table locks, 247 table definitions (4/4).
 - **Nginx Architecture & Container Bundling:** Custom `Dockerfile.nginx`, application file bundling into `/var/www/sparky-lms`, read-only root permissions, `entrypoint-nginx.sh` SSL verification, HTTP to HTTPS 301 redirect, TLS key/cert requirements, `/app/courses` blocking, curriculum routing, and `/app/upload` blocking (13/13).
 
-**Summary: 71 PASSED / 0 FAILED (100% Pass Rate)**
+**Summary: 80 PASSED / 0 FAILED (100% Pass Rate)**

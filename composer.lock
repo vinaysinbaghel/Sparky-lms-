@@ -733,12 +733,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/culqi/culqi-php.git",
-                "reference": "fe7e2743439661bab1751d2e45a03b83e400f515"
+                "reference": "5fa5bd47fadd86b48e6117991de7943e6d3acfa5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/culqi/culqi-php/zipball/fe7e2743439661bab1751d2e45a03b83e400f515",
-                "reference": "fe7e2743439661bab1751d2e45a03b83e400f515",
+                "url": "https://api.github.com/repos/culqi/culqi-php/zipball/5fa5bd47fadd86b48e6117991de7943e6d3acfa5",
+                "reference": "5fa5bd47fadd86b48e6117991de7943e6d3acfa5",
                 "shasum": ""
             },
             "require": {

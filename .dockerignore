@@ -1,0 +1,83 @@
+# ==============================================================================
+# Sparky LMS — Production Docker Build Ignore Rules
+# Excludes sensitive secrets, local credentials, logs, cache, uploads & test artefacts
+# ==============================================================================
+
+# Environment files & deployment secrets
+.env
+.env.*
+.env.local
+.env.test
+.env.prod
+
+# SSL certificates and private keys
+docker/ssl/*.key
+docker/ssl/*.pem
+docker/ssl/*.crt
+docker/ssl/*.csr
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+
+# Local configuration containing credentials
+app/config/configuration.php
+app/config/parameters.yml
+app/config/*.conf.php
+!app/config/configuration.php.dist
+
+# Version control & CI/CD metadata
+.git
+.github
+.gitignore
+.gitattributes
+
+# Database backups, dumps & raw SQL scripts
+database/
+*.sql
+*.sql.gz
+*.bak
+*.backup
+*.dump
+
+# Application runtime logs
+app/logs/*
+!app/logs/.gitkeep
+*.log
+logs/
+
+# Application runtime cache
+app/cache/*
+!app/cache/.gitkeep
+!app/cache/.htaccess
+cache/
+.phpunit.cache
+.php_cs.cache
+.cache
+
+# Mutable user uploads & persistent course assets (isolated via volumes)
+app/upload/*
+!app/upload/.gitkeep
+app/courses/*
+!app/courses/proxy.php
+upload/
+
+# Test suites & development artefacts
+tests/
+scratch/
+documentation/
+vendor/
+behat/
+phpunit.xml*
+phpmd.xml
+build.phing.xml
+phpDocumentor.ini
+
+# Developer environment & OS artefacts
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

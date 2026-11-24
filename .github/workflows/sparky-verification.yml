@@ -19,27 +19,33 @@ jobs:
       mariadb:
         image: mariadb:10.11
         env:
-          MYSQL_ROOT_PASSWORD: testpass123
+          MYSQL_ROOT_PASSWORD: test_root_pass_123
           MYSQL_DATABASE: sparky_integration_test
+          MYSQL_USER: sparky_test_user
+          MYSQL_PASSWORD: test_user_pass_123
         ports:
           - 3306:3306
         options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=5
 
       redis:
         image: redis:7-alpine
+        command: redis-server --requirepass test_redis_secure_pass_2026
         ports:
           - 6379:6379
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: --health-cmd="redis-cli -a test_redis_secure_pass_2026 ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
     env:
+      TEST_MODE: "1"
       SECURITY_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-      DB_HOST: "127.0.0.1"
-      DB_PORT: "3306"
-      DB_NAME: "sparky_integration_test"
-      DB_USER: "root"
-      DB_PASSWORD: "testpass123"
-      REDIS_HOST: "127.0.0.1"
-      REDIS_PORT: "6379"
+      TEST_DB_HOST: "127.0.0.1"
+      TEST_DB_PORT: "3306"
+      TEST_DB_NAME: "sparky_integration_test"
+      TEST_DB_USER: "sparky_test_user"
+      TEST_DB_PASSWORD: "test_user_pass_123"
+      TEST_REDIS_HOST: "127.0.0.1"
+      TEST_REDIS_PORT: "6379"
+      TEST_REDIS_PASSWORD: "test_redis_secure_pass_2026"
+      REDIS_PASSWORD: "test_redis_secure_pass_2026"
 
     steps:
       - name: Checkout Source
@@ -49,7 +55,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: curl, fileinfo, gd, intl, json, mbstring, xml, zip, pdo_mysql, mysqli, redis
+          extensions: curl, fileinfo, gd, intl, json, mbstring, xml, zip, pdo_mysql, mysqli, redis, soap
           coverage: none
 
       - name: Validate composer.json & lockfile

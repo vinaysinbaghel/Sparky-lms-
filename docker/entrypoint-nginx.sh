@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 # ==============================================================================
-# Sparky LMS — Production Nginx Gateway Entrypoint
+# Sparky LMS â€” Production Nginx Gateway Entrypoint
 # Validates SSL certificates, directory permissions, and configuration syntax.
 # ==============================================================================
 set -e
