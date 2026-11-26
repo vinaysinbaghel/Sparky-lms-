@@ -61,6 +61,9 @@ jobs:
       - name: Validate composer.json & lockfile
         run: composer validate --check-lock --no-check-all
 
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --no-scripts --prefer-dist --no-interaction --no-progress --optimize-autoloader --ignore-platform-reqs
+
       - name: Generate Local SSL Certificates for Gateway
         run: bash docker/ssl/generate-certs.sh
 
@@ -103,6 +106,9 @@ jobs:
           php-version: '8.2'
           extensions: curl, fileinfo, gd, intl, json, mbstring, xml, zip, pdo_mysql, mysqli, redis
           coverage: none
+
+      - name: Install Composer Dependencies
+        run: composer install --no-dev --no-scripts --prefer-dist --no-interaction --no-progress --optimize-autoloader --ignore-platform-reqs
 
       - name: Generate Fresh Test Secrets & Local Certificates
         run: |
