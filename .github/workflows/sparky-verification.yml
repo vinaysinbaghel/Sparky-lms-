@@ -143,7 +143,7 @@ jobs:
           timeout=120
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            healthy=$(docker compose ps --filter "health=healthy" -q | wc -l)
+            healthy=$(docker compose ps | grep -c "(healthy)" || true)
             total=$(docker compose ps -q | wc -l)
             echo "Healthy containers: $healthy / $total"
             if [ "$healthy" -ge 4 ] && [ "$total" -ge 4 ]; then
